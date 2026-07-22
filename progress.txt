@@ -8,10 +8,11 @@
 - 已完成配置与运行证据脱敏：父目录配置不再继承，配置项密钥、模型输出、工具输出、session、trace、report 和 memory 写入均不会持久化明文秘密，同时不破坏内存中的工具解析语义。
 - 已补齐英文 README、运行证据结构文档和 Windows sandbox 降级说明。
 - 最新 quick gate：Ruff 通过，60 passed，2 skipped（37.13 秒）。
-- 最新 full gate：Ruff 通过，337 passed，5 skipped（151.57 秒）；Gate8 离线真实会话 9/9 通过；deterministic evaluation 12/12 通过，pass rate 与 verifier pass rate 均为 100%。
+- 最新 full gate：Ruff 通过，337 passed，5 skipped、0 warnings（147.68 秒）；Gate8 离线真实会话 9/9 通过；deterministic evaluation 12/12 通过，pass rate 与 verifier pass rate 均为 100%。
 - CLI smoke：`python -m niko_agent --help` 通过；`git diff --check` 通过；常见真实密钥格式扫描无命中。
 - 已创建本地里程碑提交：`53d9e33`（安全/恢复/运行时）与 `d8718d6`（有界 verifier）。
 - 已提交最终文档与交付证据：`d3a646c`。
+- 已完成计划条款逐项证据审计，并用 `bceee1a` 修复 metrics 的时区弃用警告。
 
 进行中
 - 本地离线开发与交付已完成，等待用户决定是否授权真实 provider 最小烟测、GitHub push，以及是否终止 4 个早期超时遗留进程。
@@ -24,6 +25,6 @@
 已知bug
 - 当前离线交付门禁没有已知功能失败。
 - 当前 Windows 主机没有创建符号链接的权限，相关安全测试按设计跳过；其他符号链接逻辑由可用平台测试覆盖。
-- metrics 仍产生 6 条 `datetime.utcnow()` 弃用警告，不影响当前功能或门禁结果。
 - 4 个早期超时遗留 Python 进程仍存在，其中 PID 35152 持续占用约一个 CPU；因未获终止授权而保留。
 - 当前 Git 对象库不包含历史 pico 基线 `4adae0b`，`D:\codex_project` 下也没有可用的 pico 仓库，因此无法补跑计划中历史基线的原始门禁；当前 Niko 代码的完整门禁已通过。
+- 当前命令环境没有 `uv` 可执行文件；三个计划入口已用同一虚拟环境的底层 Python 命令验证，但 `uv run ...` 包装形式需获准安装 `uv` 后才能原样复跑。

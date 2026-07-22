@@ -37,6 +37,22 @@
 
 - `53d9e33 feat(recovery): harden workspace recovery and secret boundaries`
 - `d8718d6 fix(verify): bound offline gate process lifetime`
+- `bceee1a fix(metrics): use timezone-aware capture timestamps`
+
+### 明确边界场景证据
+
+| 计划中的明确场景 | 直接测试证据 |
+|---|---|
+| fork 的 latest、序号、event_id、turn_id 与父会话只追加 | `test_fork_keeps_workspace_and_parent_session`、`test_fork_accepts_index_event_id_and_turn_id` |
+| rollback 先预览、再确认；新文件删除与旧文件恢复 | `test_rollback_requires_preview_and_restores_git_visible_workspace` |
+| token 过期、复用和确认参数约束 | `test_rollback_token_expires_and_cannot_be_reused`、`test_rollback_confirm_requires_exactly_one_token` |
+| 预览后任意 workspace 漂移拒绝执行 | `test_rollback_refuses_when_workspace_changes_after_preview` |
+| 16 MiB 单文件与 128 MiB 总量不生成残缺快照 | `test_oversized_snapshot_is_unavailable_instead_of_partial`、`test_total_snapshot_limit_is_unavailable_instead_of_partial` |
+| 敏感、ignored、符号链接排除 | `test_snapshot_excludes_sensitive_files_and_symbolic_links`、敏感路径参数化测试 |
+| manifest/文件损坏、非规范路径和 Windows 大小写碰撞 | `test_rollback_rejects_corrupted_snapshot_and_consumes_token`、`test_noncanonical_manifest_paths_are_rejected`、`test_windows_manifest_path_collision_is_rejected` |
+| 备份失败、恢复中断、子会话创建后失败与父会话不变 | `test_rollback_backup_failure_does_not_modify_workspace`、`test_rollback_interruption_restores_pre_operation_workspace`、`test_failure_after_child_creation_marks_child_failed_and_restores_parent` |
+| required sandbox 无后端时关闭、best_effort 明确降级 | `test_required_sandbox_rejects_when_backend_is_unavailable`、`test_run_shell_best_effort_sandbox_degrades_and_keeps_permission_gate` |
+| verifier 超时仅终止本次子进程树 | `test_run_timeout_cleans_only_spawned_process_tree`、`test_windows_cleanup_targets_spawned_pid_tree` |
 
 ### Quick gate
 
@@ -59,10 +75,10 @@ D:\codex_project\Niko-Agent\.venv\Scripts\python.exe scripts/verify.py --profile
 结果：
 
 - Ruff：通过。
-- 全量 pytest：337 passed，5 skipped，6 warnings，151.57 秒。
+- 全量 pytest：337 passed，5 skipped，0 warnings，147.68 秒。
 - Gate8 real-session acceptance：9 个场景全部通过。
 - deterministic evaluation：12/12 通过，失败 0，pass rate 1.0，verifier pass rate 1.0，全部在预算内。
-- 总耗时：169.7 秒；最终输出 `Niko-Agent full verification passed.`
+- 总耗时：167.6 秒；最终输出 `Niko-Agent full verification passed.`
 
 ### 其他审计
 
@@ -75,7 +91,8 @@ D:\codex_project\Niko-Agent\.venv\Scripts\python.exe scripts/verify.py --profile
 ## 已知限制
 
 - 当前 Git 对象库不包含计划指定的 pico 历史提交 `4adae0b`，`D:\codex_project` 下也没有本地 pico 仓库，因此无法重建并复跑未保存的历史基线输出。当前报告只声明 Niko 当前代码门禁，不冒充历史基线证据。
-- full gate 有 5 个环境条件 skip；其中当前 Windows 主机无符号链接创建权限。另有 6 条 `datetime.utcnow()` 弃用警告，不影响通过结果。
+- full gate 有 5 个环境条件 skip：3 个是当前 Windows 主机无符号链接创建权限，2 个是真实 provider/dogfood 默认离线禁用；没有测试警告。
+- 当前命令环境没有可用的 `uv` 可执行文件，因此计划中的三个 `uv run ...` 包装命令未原样复跑；其对应的当前虚拟环境 Python 入口、quick/full verifier、CLI smoke 与 deterministic evaluation 均已通过。安装 `uv` 会修改工具环境，需用户授权后执行。
 - 早期外层超时留下的 6 个 Python 进程已有 2 个自然结束；PID 26312、35152、35664、44724 仍存在，PID 35152 持续占用约一个 CPU。未获得用户授权前没有终止任何进程。
 - 真实 provider 烟测和 GitHub push 尚未执行；两者都需要用户单独明确授权。
 
