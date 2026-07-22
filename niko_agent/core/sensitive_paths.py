@@ -75,4 +75,3 @@ def is_sensitive_path(raw_path) -> bool:
 def require_non_sensitive_path(raw_path):
     if is_sensitive_path(raw_path):
         raise ValueError("sensitive path is not available to model tools")
-

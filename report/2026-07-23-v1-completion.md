@@ -83,7 +83,7 @@ D:\codex_project\Niko-Agent\.venv\Scripts\python.exe scripts/verify.py --profile
 ### 其他审计
 
 - `python -m niko_agent --help` 正常输出唯一 Niko CLI 参数。
-- `git diff --check` 通过；仅显示 Git 的 LF/CRLF 工作树提示，没有空白错误。
+- 当前改动及相对 `feature/niko-v1` 的完整分支差异均通过 `git diff --check`；仅显示 Git 的 LF/CRLF 工作树提示，没有空白错误。
 - 对工作区执行常见 AWS、GitHub、OpenAI 与私钥头格式扫描，无真实密钥命中。
 - `.niko/`、虚拟环境、缓存和 evaluation 运行产物均未进入待提交文件列表。
 - Windows 无符号链接创建权限时，相应用例明确 skip；required sandbox 无后端时 fail closed、best_effort 明确降级的测试通过。

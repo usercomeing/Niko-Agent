@@ -559,4 +559,3 @@ def test_failure_after_child_creation_marks_child_failed_and_restores_parent(
     )
     assert journal["status"] == "recovered_after_failure"
     assert journal["failed_child_session_id"] == failed_child["id"]
-

@@ -82,4 +82,3 @@ uv run python scripts/run_v3_human_scenario_gate.py --suite full --output-dir /t
 - 杈撳嚭鐩綍蹇呴』鍦?repo 澶栵紝閬垮厤 Niko 鍚戜笂鍙戠幇鐪熷疄 repo root銆?
 - live provider 榛樿鐢?DeepSeek锛岄厤缃潵鑷」鐩?`.niko.toml`锛屼笉鎶?key 鍐欒繘鏂囨。鎴栦骇鐗┿€?
 - 鍙戠幇浜у搧闂鏃跺厛淇骇鍝侊紝鍐嶈ˉ narrow regression锛涗笉瑕侀€氳繃鏀惧鍦烘櫙鏂█鎺╃洊闂銆?
-

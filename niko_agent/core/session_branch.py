@@ -447,4 +447,3 @@ def confirm_runtime_rollback(runtime, token):
             f"rollback failed; original workspace restored; inspect {failure['recovery_path']}"
         ) from error
     return result
-
