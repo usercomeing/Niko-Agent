@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "niko-agent"
+version = "0.1.0"
+description = "Local, white-box coding agent with safe recovery and auditable evidence"
+requires-python = ">=3.10"
+dependencies = [
+  "pydantic>=2.0.0",
+  "textual>=0.86.0",
+  "tzdata>=2025.2; platform_system == 'Windows'",
+  "tomli>=2.0.0; python_version < '3.11'",
+]
+
+[project.scripts]
+niko = "niko_agent.cli:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3.5",
+  "pytest-asyncio>=0.23.0",
+  "ruff>=0.4.4",
+]
+
+[tool.setuptools.packages.find]
+include = ["niko_agent*"]
+
+[tool.pytest.ini_options]
+norecursedirs = [
+  ".git",
+  ".niko",
+  ".venv",
+  "artifacts",
+  "build",
+  "dist",
+]

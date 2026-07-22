@@ -1,0 +1,15 @@
+Niko-Agent
+==========
+
+Niko-Agent is an authorized derivative of the local pico codebase at commit
+4adae0b21b7525ab7d6678689253aff20d291fdc.
+
+Design references reviewed during development:
+
+- Pony Code: https://github.com/xiawiie/pony-code (MIT)
+- Bunny Byte: https://github.com/LISAooo1234/Bunny-Byte
+
+Niko-Agent's original changes include the Niko public interface, centralized
+sensitive-path protection, append-only session forks, token-confirmed Git-visible
+workspace rollback, recovery journals, and cross-platform verification entrypoints.
+
