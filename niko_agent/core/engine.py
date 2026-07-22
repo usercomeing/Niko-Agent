@@ -60,6 +60,7 @@ class Engine:
 
     def run_turn(self, user_message):
         agent = self.runtime
+        user_message = agent.redact_text(user_message)
         run_started_at = time.monotonic()
         task_state = TaskState.create(
             run_id=agent.new_run_id(),
@@ -125,6 +126,10 @@ class Engine:
             agent.run_store.write_task_state(task_state)
             prompt_started_at = time.monotonic()
             prompt, prompt_metadata = agent._build_prompt_and_metadata(user_message)
+            # Persist audit metadata before any fail-closed early return. Unsafe
+            # resume states intentionally skip the model request, but their report
+            # must still explain why execution stopped.
+            agent.last_prompt_metadata = prompt_metadata
             agent.emit_trace(
                 task_state,
                 "prompt_built",
@@ -279,11 +284,18 @@ class Engine:
                     run_started_at,
                 )
                 return
-            raw = result.text
-            completion_metadata = dict(
-                result.metadata
-                or getattr(agent.model_client, "last_completion_metadata", {})
-                or {}
+            # Parse the in-memory provider response before redaction so secret
+            # placeholders cannot alter JSON/tool syntax or shell semantics.
+            # Only redacted values may cross a persistence or user-output boundary.
+            raw = str(result.text)
+            completion_metadata = agent.redact_artifact(
+                dict(
+                    result.metadata
+                    or getattr(
+                        agent.model_client, "last_completion_metadata", {}
+                    )
+                    or {}
+                )
             )
             if completion_metadata:
                 prompt_metadata.update(completion_metadata)
@@ -350,7 +362,7 @@ class Engine:
                 yield {"type": "retry", "run_id": task_state.run_id, "content": payload}
                 continue
 
-            final = (payload or raw).strip()
+            final = agent.redact_text((payload or raw).strip())
             yield from self._drain_worker_notification_events()
             if agent.runtime_mode == "plan" and not agent.plan_mode.can_finish():
                 notice = agent.plan_mode.final_notice()

@@ -281,8 +281,8 @@ def build_memory_system_section(memory_dir):
         index_section = "No durable memories consolidated yet.\n"
     section = f"""# Auto Memory
 
-You have a persistent, file-based memory system at `{Path(memory_dir)}/`.
-This directory already exists. Write to it directly with memory-safe file tools; do not create a second memory store.
+You have a persistent, file-based memory system managed privately by Niko.
+Ordinary model tools cannot access `.niko/`; use the memory context and tags below instead of file tools.
 
 ## Critical memory contract
 - `/remember <text>` appends a note to the daily log.
@@ -291,12 +291,12 @@ This directory already exists. Write to it directly with memory-safe file tools;
 - Structured memory files must use frontmatter: `name`, `description`, and `type`.
 - Allowed `type` values are `user`, `feedback`, `project`, and `reference`.
 - MEMORY.md is an index, not a memory. Keep it under {MAX_ENTRYPOINT_LINES} lines.
-- If the user asks you to forget something, find and remove the relevant entry.
+- If the user asks you to forget something, emit a concise `<memory>Forget request: ...</memory>` note so the next dream pass can remove it.
 
 {index_section}
 Build this memory system over time so future sessions can understand who the user is, how they prefer to collaborate, what behavior to avoid or repeat, and the context behind long-running work.
 
-If the user explicitly asks you to remember something, save it immediately using whichever type fits best. If they ask you to forget something, find and remove the relevant entry instead of adding a contradiction.
+If the user explicitly asks you to remember something, save it immediately with a `<memory>` tag using whichever type fits best. If they ask you to forget something, record a forget request instead of adding a contradiction.
 
 ## Types of memory
 
@@ -330,11 +330,10 @@ Pointers to where information lives in external systems and why it matters.
 
 ## How to save memories
 
-**Option A — <memory> tags (quick notes):**
+**Use `<memory>` tags:**
 Wrap text in `<memory>...</memory>` tags in your final answer. These are automatically extracted and appended to the daily log.
 
-**Option B - Write files directly (structured memories):**
-Write a `.md` file under `{Path(memory_dir)}/` with this frontmatter:
+The internal dream profile later consolidates notes into structured `.md` files with this frontmatter:
 
 ```markdown
 ---
@@ -346,12 +345,12 @@ type: {{{{user | feedback | project | reference}}}}
 {{{{memory content}}}}
 ```
 
-Then add a pointer to that file in `{Path(memory_dir)}/{ENTRYPOINT_NAME}`. MEMORY.md is an index, not a memory; it should contain only links with brief descriptions. Keep it under {MAX_ENTRYPOINT_LINES} lines.
+The dream profile then adds a pointer to the file in `{ENTRYPOINT_NAME}`. MEMORY.md is an index, not a memory; it contains only links with brief descriptions and stays under {MAX_ENTRYPOINT_LINES} lines.
 
 ## When to access memories
 - When specific known memories seem relevant to the task at hand
 - When the user seems to be referring to work from a prior conversation
-- You MUST access memory when the user explicitly asks you to recall or remember
+- You MUST use the provided memory context when the user explicitly asks you to recall or remember; do not call file tools on `.niko/`
 
 ## Slash commands
 - `/remember <text>` appends a note to the daily log.
@@ -506,19 +505,26 @@ def run_dream(agent, quiet=False, session_ids=None):
     ensure_memory_dir(agent.memory_dir)
     session_ids = list(session_ids or [])
     before_snapshot = _memory_file_snapshot(agent)
-    dream_prompt = build_dream_prompt(agent.memory_dir, transcript_dir=str(agent.session_store.root), session_ids=session_ids)
+    dream_prompt = build_dream_prompt(
+        agent.memory_dir,
+        transcript_dir="",
+        session_ids=session_ids,
+    )
     try:
         memory_scope = Path(agent.memory_dir).resolve().relative_to(agent.root)
     except ValueError:
         memory_scope = Path(".niko") / "memory"
     dream_agent = Niko(
         model_client=agent.model_client,
-        workspace=WorkspaceContext.build(agent.root),
+        workspace=WorkspaceContext.build(
+            agent.root, repo_root_override=agent.root
+        ),
         session_store=agent.session_store,
         approval_policy="auto",
         max_steps=max(agent.max_steps, 20),
         max_new_tokens=max(agent.max_new_tokens, DREAM_MIN_NEW_TOKENS),
         secret_env_names=agent.secret_env_names,
+        secret_values=agent.secret_values,
         feature_flags={**agent.feature_flags, "memory": False, "relevant_memory": False},
         write_scope=[str(memory_scope)],
         memory_dir=agent.memory_dir,

@@ -17,7 +17,11 @@ class SlashCommand:
 SLASH_COMMANDS: tuple[SlashCommand, ...] = (
     SlashCommand("help", "/help", "Show commands.", ("h",)),
     SlashCommand("clear", "/clear", "Create a new empty session."),
-    SlashCommand("fork", "/fork [event|turn|#]", "Create a child session without changing files."),
+    SlashCommand(
+        "fork",
+        "/fork [latest|index|event_id|turn_id]",
+        "Create a child session without changing files.",
+    ),
     SlashCommand("rollback", "/rollback <point> | /rollback --confirm <token>", "Preview or confirm a workspace rollback."),
     SlashCommand("compact", "/compact", "Compact older session history."),
     SlashCommand("context", "/context", "Show prompt context usage."),

@@ -24,7 +24,7 @@ from .plan_mode import PlanModeController
 from .permissions import PermissionChecker
 from .run_store import RunStore
 from .runtime_consumers import default_runtime_consumers
-from .runtime_checkpoints import RuntimeCheckpointsMixin
+from .runtime_checkpoints import CHECKPOINT_SCHEMA_VERSION, RuntimeCheckpointsMixin
 from .runtime_events import build_runtime_event
 from .runtime_secrets import REDACTED_VALUE, RuntimeSecretsMixin
 from .session_events import SessionEventBus
@@ -64,7 +64,6 @@ DEFAULT_FEATURE_FLAGS = {
     "context_reduction": True,
     "prompt_cache": True,
 }
-CHECKPOINT_SCHEMA_VERSION = "niko-v1"
 CHECKPOINT_NONE_STATUS = "no-checkpoint"
 CHECKPOINT_FULL_VALID_STATUS = "full-valid"
 CHECKPOINT_PARTIAL_STALE_STATUS = "partial-stale"
@@ -99,6 +98,7 @@ class Niko(RuntimeSecretsMixin, RuntimeCheckpointsMixin):
         read_only=False,
         shell_env_allowlist=None,
         secret_env_names=None,
+        secret_values=None,
         feature_flags=None,
         write_scope=None,
         memory_dir=None,
@@ -133,6 +133,17 @@ class Niko(RuntimeSecretsMixin, RuntimeCheckpointsMixin):
             shell_env_allowlist or DEFAULT_SHELL_ENV_ALLOWLIST
         )
         self.secret_env_names = {str(name).upper() for name in (secret_env_names or ())}
+        self.secret_values = tuple(
+            sorted(
+                {
+                    str(value)
+                    for value in (secret_values or ())
+                    if len(str(value)) >= 4
+                },
+                key=len,
+                reverse=True,
+            )
+        )
         if isinstance(write_scope, str):
             write_scope = [write_scope]
         self.write_scope = tuple(
@@ -342,10 +353,10 @@ class Niko(RuntimeSecretsMixin, RuntimeCheckpointsMixin):
                     if saved_identity.get(key) != current_identity.get(key):
                         mismatch_fields.append(key)
                 mismatch_fields.sort()
-                if stale_paths:
-                    status = CHECKPOINT_PARTIAL_STALE_STATUS
-                elif mismatch_fields:
+                if mismatch_fields:
                     status = CHECKPOINT_WORKSPACE_MISMATCH_STATUS
+                elif stale_paths:
+                    status = CHECKPOINT_PARTIAL_STALE_STATUS
                 else:
                     status = CHECKPOINT_FULL_VALID_STATUS
 
@@ -519,7 +530,9 @@ class Niko(RuntimeSecretsMixin, RuntimeCheckpointsMixin):
 
         # 工作区事实相对稳定，所以这里按整体刷新；
         # 只有这些事实真的变化了，才重建完整 prefix。
-        refreshed_workspace = WorkspaceContext.build(self.root)
+        refreshed_workspace = WorkspaceContext.build(
+            self.root, repo_root_override=self.root
+        )
         refreshed_workspace_fingerprint = refreshed_workspace.fingerprint()
         workspace_changed = (
             force or refreshed_workspace_fingerprint != previous_workspace_fingerprint
@@ -596,6 +609,7 @@ class Niko(RuntimeSecretsMixin, RuntimeCheckpointsMixin):
         return prompt
 
     def record(self, item):
+        item = self.redact_artifact(item)
         self.session["history"].append(self.turn_history.enrich(item))
         self.session_path = self.session_store.save(self.session)
 
@@ -653,7 +667,7 @@ class Niko(RuntimeSecretsMixin, RuntimeCheckpointsMixin):
             "context_usage": metadata.get("context_usage", {}),
         }
         self.session_event_bus.emit("context_usage_recorded", usage_payload)
-        return prompt, metadata
+        return self.redact_text(prompt), metadata
 
     def compact_history(self, trigger="manual", keep_recent_turns=2):
         return self.compact_manager.compact(
@@ -664,6 +678,7 @@ class Niko(RuntimeSecretsMixin, RuntimeCheckpointsMixin):
         return memorylib.load_memory_index_text(self.memory_dir)
 
     def remember_durable_note(self, text):
+        text = self.redact_text(text)
         path = memorylib.append_to_daily_log(self.memory_dir, text)
         if path:
             self.session_event_bus.emit(

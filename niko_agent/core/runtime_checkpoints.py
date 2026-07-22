@@ -14,12 +14,21 @@ from .sensitive_paths import is_sensitive_path
 CHECKPOINT_SCHEMA_VERSION = "niko-v1"
 MAX_SNAPSHOT_FILE_BYTES = 16 * 1024 * 1024
 MAX_SNAPSHOT_TOTAL_BYTES = 128 * 1024 * 1024
+SNAPSHOT_EXCLUSIONS = (
+    ".git/ metadata",
+    ".niko/ runtime state",
+    "Git-ignored files",
+    "sensitive paths and credentials",
+    "symbolic links",
+)
 
 
 class RuntimeCheckpointsMixin:
     def git_visible_files(self):
         """Return tracked and non-ignored untracked regular files."""
         try:
+            if not getattr(self.workspace, "git_available", False):
+                raise RuntimeError("workspace root is not a Git repository")
             result = subprocess.run(
                 ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
                 cwd=self.root,
@@ -29,11 +38,16 @@ class RuntimeCheckpointsMixin:
             )
             candidates = [item for item in result.stdout.decode("utf-8", "replace").split("\0") if item]
         except Exception:
+            ignored_names = {name.casefold() for name in IGNORED_PATH_NAMES}
             candidates = [
                 path.relative_to(self.root).as_posix()
                 for path in self.root.rglob("*")
                 if path.is_file()
-                and not any(part in IGNORED_PATH_NAMES for part in path.relative_to(self.root).parts)
+                and not any(
+                    part.casefold() in ignored_names
+                    for part in path.relative_to(self.root).parts
+                )
+                and not is_sensitive_path(path.relative_to(self.root))
             ]
         files = []
         for relative in sorted(set(candidates)):
@@ -70,13 +84,13 @@ class RuntimeCheckpointsMixin:
         total = 0
         try:
             for relative, path in self.git_visible_files():
-                size = path.stat().st_size
+                data = path.read_bytes()
+                size = len(data)
                 if size > MAX_SNAPSHOT_FILE_BYTES:
                     raise ValueError(f"snapshot file exceeds 16 MiB: {relative}")
                 total += size
                 if total > MAX_SNAPSHOT_TOTAL_BYTES:
                     raise ValueError("snapshot exceeds 128 MiB")
-                data = path.read_bytes()
                 target = files_root / Path(relative)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(data)
@@ -115,12 +129,17 @@ class RuntimeCheckpointsMixin:
 
     def capture_workspace_snapshot(self):
         snapshot = {}
+        ignored_names = {name.casefold() for name in IGNORED_PATH_NAMES}
         for path in self.root.rglob("*"):
             try:
                 relative_parts = path.relative_to(self.root).parts
             except ValueError:
                 continue
-            if any(part in IGNORED_PATH_NAMES for part in relative_parts) or not path.is_file():
+            if (
+                any(part.casefold() in ignored_names for part in relative_parts)
+                or is_sensitive_path(path.relative_to(self.root))
+                or not path.is_file()
+            ):
                 continue
             try:
                 snapshot[path.relative_to(self.root).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -161,7 +180,7 @@ class RuntimeCheckpointsMixin:
             "created_at": now(),
             "current_goal": str(user_message),
             "completed": [task_state.final_answer] if task_state.final_answer else [],
-            "excluded": [],
+            "excluded": list(SNAPSHOT_EXCLUSIONS),
             "current_blocker": "" if str(task_state.stop_reason or "") in ("", "final_answer_returned") else str(task_state.stop_reason),
             "next_step": self.infer_next_step(task_state),
             "key_files": key_files,

@@ -6,7 +6,7 @@ from .workspace import clip, now
 
 def finish_model_error(engine, task_state, user_message, prompt_metadata, exc, duration_ms, run_duration_ms):
     agent = engine.runtime
-    error_metadata = _error_metadata(exc)
+    error_metadata = agent.redact_artifact(_error_metadata(exc))
     prompt_metadata.update(error_metadata)
     agent.last_completion_metadata = error_metadata
     agent.last_prompt_metadata = prompt_metadata

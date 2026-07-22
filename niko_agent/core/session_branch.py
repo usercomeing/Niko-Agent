@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
+import posixpath
 import secrets
-import shutil
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -120,39 +121,169 @@ def preview_runtime_rollback(runtime, target="latest"):
     return preview
 
 
-def _copy_manifest_files(source_root, manifest, target_root):
+def _normalized_manifest_path(relative):
+    relative = str(relative).replace("\\", "/")
+    normalized = posixpath.normpath(relative)
+    if (
+        relative in {"", ".", ".."}
+        or relative.startswith("/")
+        or normalized != relative
+        or normalized.startswith("../")
+    ):
+        raise SessionBranchError(f"non-canonical rollback path: {relative}")
+    return normalized
+
+
+def _safe_manifest_path(root, relative, *, reject_symlink=False):
+    relative = _normalized_manifest_path(relative)
+    if is_sensitive_path(relative):
+        raise SessionBranchError(f"sensitive path in rollback manifest: {relative}")
+    root = Path(root).resolve()
+    candidate = root / Path(relative)
+    if reject_symlink and candidate.is_symlink():
+        raise SessionBranchError(f"symbolic link in rollback manifest: {relative}")
+    path = candidate.resolve()
+    try:
+        path.relative_to(root)
+    except ValueError as exc:
+        raise SessionBranchError(f"path escapes rollback root: {relative}") from exc
+    return path
+
+
+def _manifest_path_map(manifest, *, case_insensitive=None):
+    if not isinstance(manifest, dict):
+        raise SessionBranchError("rollback manifest files must be a mapping")
+    if case_insensitive is None:
+        case_insensitive = os.name == "nt"
+    mapped = {}
     for relative in manifest:
-        if is_sensitive_path(relative):
-            raise SessionBranchError(f"sensitive path in rollback manifest: {relative}")
-        source = source_root / Path(relative)
-        target = target_root / Path(relative)
+        normalized = _normalized_manifest_path(relative)
+        key = normalized.casefold() if case_insensitive else normalized
+        if key in mapped:
+            raise SessionBranchError(
+                f"rollback manifest contains a path collision: {normalized}"
+            )
+        mapped[key] = normalized
+    return mapped
+
+
+def _validated_manifest_bytes(source_root, manifest):
+    _manifest_path_map(manifest)
+    contents = {}
+    for relative, metadata in manifest.items():
+        relative = _normalized_manifest_path(relative)
+        if not isinstance(metadata, dict):
+            raise SessionBranchError(f"invalid rollback metadata: {relative}")
+        source = _safe_manifest_path(source_root, relative, reject_symlink=True)
+        if not source.is_file():
+            raise SessionBranchError(f"rollback source is unavailable: {relative}")
+        data = source.read_bytes()
+        expected_size = int(metadata.get("size", -1))
+        expected_sha256 = str(metadata.get("sha256", ""))
+        actual_sha256 = hashlib.sha256(data).hexdigest()
+        if len(data) != expected_size or actual_sha256 != expected_sha256:
+            raise SessionBranchError(f"rollback source hash mismatch: {relative}")
+        contents[relative] = data
+    return contents
+
+
+def _copy_manifest_files(source_root, manifest, target_root):
+    contents = _validated_manifest_bytes(source_root, manifest)
+    for relative, data in contents.items():
+        target = _safe_manifest_path(target_root, relative)
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source, target)
+        target.write_bytes(data)
 
 
 def _restore_manifest(runtime, source_root, desired):
+    contents = _validated_manifest_bytes(source_root, desired)
     current = runtime.workspace_content_manifest()
-    for relative in sorted(set(current) - set(desired), reverse=True):
-        path = runtime.root / Path(relative)
+    current_paths = _manifest_path_map(current)
+    desired_paths = _manifest_path_map(desired)
+    delete_paths = [
+        relative
+        for key, relative in current_paths.items()
+        if key not in desired_paths or desired_paths[key] != relative
+    ]
+    for relative in sorted(delete_paths, reverse=True):
+        path = _safe_manifest_path(runtime.root, relative)
         if path.exists() and path.is_file() and not path.is_symlink():
             path.unlink()
-    for relative in sorted(desired):
-        source = source_root / Path(relative)
-        target = runtime.root / Path(relative)
+    for relative in sorted(contents):
+        target = _safe_manifest_path(runtime.root, relative)
         target.parent.mkdir(parents=True, exist_ok=True)
         temp = target.with_name(f".{target.name}.{uuid.uuid4().hex}.rollback")
-        shutil.copyfile(source, temp)
+        temp.write_bytes(contents[relative])
         os.replace(temp, target)
+
+
+def _write_json(path, payload):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    temp.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    os.replace(temp, path)
+
+
+def _record_rollback_failure(
+    runtime,
+    recovery_root,
+    journal,
+    *,
+    status,
+    error,
+    workspace_recovered,
+    recovery_error=None,
+):
+    journal["status"] = status
+    journal["failed_at"] = now()
+    journal["restore_error"] = str(error)[:500]
+    journal["recovery_error"] = str(recovery_error)[:500] if recovery_error else ""
+    journal_recorded = True
+    try:
+        _write_json(
+            recovery_root / "journal.json", runtime.redact_artifact(journal)
+        )
+    except Exception:
+        journal_recorded = False
+    payload = {
+        "operation_id": journal["operation_id"],
+        "status": journal["status"],
+        "recovery_path": str(recovery_root.relative_to(runtime.root)).replace("\\", "/"),
+        "workspace_recovered": workspace_recovered,
+        "journal_recorded": journal_recorded,
+    }
+    report_recorded = True
+    try:
+        _write_json(
+            recovery_root / "report.json",
+            runtime.redact_artifact(
+                {
+                    **journal,
+                    "workspace_recovered": workspace_recovered,
+                    "journal_recorded": journal_recorded,
+                }
+            ),
+        )
+    except Exception:
+        report_recorded = False
+    payload["report_recorded"] = report_recorded
+    try:
+        runtime.session_event_bus.emit("rollback_failed", payload)
+    except Exception:
+        pass
+    return payload
 
 
 def confirm_runtime_rollback(runtime, token):
     previews = runtime.session.setdefault("rollback_previews", {})
-    preview = previews.get(str(token))
+    preview = previews.pop(str(token), None)
     if not preview:
         raise SessionBranchError("rollback token is invalid or already used")
+    runtime.session_path = runtime.session_store.save(runtime.session)
     if datetime.now(timezone.utc) >= datetime.fromisoformat(preview["expires_at"]):
-        previews.pop(str(token), None)
-        runtime.session_store.save(runtime.session)
         raise SessionBranchError("rollback token expired")
     current = runtime.workspace_content_manifest()
     if runtime.manifest_fingerprint(current) != preview["workspace_fingerprint"]:
@@ -162,26 +293,158 @@ def confirm_runtime_rollback(runtime, token):
     checkpoint = runtime.session["checkpoints"]["items"][preview["checkpoint_id"]]
     snapshot_root = runtime.root / checkpoint["rollback_snapshot_path"]
     desired = json.loads((snapshot_root / "manifest.json").read_text(encoding="utf-8"))["files"]
+    desired_fingerprint = runtime.manifest_fingerprint(desired)
+    expected_fingerprint = str(checkpoint.get("rollback_manifest_sha256", ""))
+    if not expected_fingerprint or desired_fingerprint != expected_fingerprint:
+        raise SessionBranchError("rollback snapshot manifest hash mismatch")
+    _validated_manifest_bytes(snapshot_root / "files", desired)
     operation_id = "rollback_" + uuid.uuid4().hex[:10]
     recovery_root = runtime.root / ".niko" / "recovery" / operation_id
     recovery_files = recovery_root / "files"
     recovery_files.mkdir(parents=True, exist_ok=True)
-    _copy_manifest_files(runtime.root, current, recovery_files)
-    (recovery_root / "manifest.json").write_text(
-        json.dumps({"files": current, "preview": preview}, indent=2, sort_keys=True), encoding="utf-8"
-    )
+    current_fingerprint = runtime.manifest_fingerprint(current)
+    sanitized_preview = {key: value for key, value in preview.items() if key != "token"}
+    journal = {
+        "operation_id": operation_id,
+        "created_at": now(),
+        "status": "backing_up",
+        "parent_session_id": parent.get("id", ""),
+        "checkpoint_id": checkpoint["checkpoint_id"],
+        "target_index": int(preview["target_index"]),
+        "pre_rollback_manifest_sha256": current_fingerprint,
+        "checkpoint_manifest_sha256": desired_fingerprint,
+        "excluded": list(checkpoint.get("excluded", [])),
+    }
+    _write_json(recovery_root / "journal.json", journal)
+    try:
+        runtime.session_event_bus.emit(
+            "rollback_confirmation_started",
+            {
+                "operation_id": operation_id,
+                "checkpoint_id": checkpoint["checkpoint_id"],
+                "target_index": int(preview["target_index"]),
+                "recovery_path": str(recovery_root.relative_to(runtime.root)).replace(
+                    "\\", "/"
+                ),
+            },
+        )
+        _copy_manifest_files(runtime.root, current, recovery_files)
+        _write_json(
+            recovery_root / "manifest.json",
+            {
+                "files": current,
+                "preview": sanitized_preview,
+                "manifest_sha256": current_fingerprint,
+            },
+        )
+        journal["status"] = "restoring"
+        journal["backup_completed_at"] = now()
+        _write_json(recovery_root / "journal.json", journal)
+    except Exception as error:
+        failure = _record_rollback_failure(
+            runtime,
+            recovery_root,
+            journal,
+            status="backup_failed",
+            error=error,
+            workspace_recovered=True,
+        )
+        raise SessionBranchError(
+            f"rollback backup failed before workspace modification; inspect {failure['recovery_path']}"
+        ) from error
     try:
         _restore_manifest(runtime, snapshot_root / "files", desired)
-    except Exception:
-        _restore_manifest(runtime, recovery_files, current)
-        raise
-    previews.pop(str(token), None)
-    result = _child_session(runtime, parent, int(preview["target_index"]), "rollback", checkpoint)
-    result["operation_id"] = operation_id
-    result["created"] = preview["created"]
-    result["modified"] = preview["modified"]
-    result["deleted"] = preview["deleted"]
-    runtime.session_event_bus.emit("rollback_completed", result)
-    runtime.session_store.save(runtime.session)
+        result = _child_session(
+            runtime,
+            parent,
+            int(preview["target_index"]),
+            "rollback",
+            checkpoint,
+        )
+        audit = {
+            "operation_id": operation_id,
+            "status": "completed",
+            "created": preview["created"],
+            "modified": preview["modified"],
+            "deleted": preview["deleted"],
+            "checkpoint_manifest_sha256": desired_fingerprint,
+            "pre_rollback_manifest_sha256": current_fingerprint,
+            "excluded": list(checkpoint.get("excluded", [])),
+            "recovery_path": str(recovery_root.relative_to(runtime.root)).replace(
+                "\\", "/"
+            ),
+        }
+        result.update(audit)
+        runtime.session["branch"].update(audit)
+        journal["status"] = "completed"
+        journal["completed_at"] = now()
+        journal["child_session_id"] = result["session_id"]
+        _write_json(recovery_root / "journal.json", journal)
+        _write_json(
+            recovery_root / "report.json",
+            runtime.redact_artifact(
+                {
+                    **audit,
+                    "parent_session_id": parent.get("id", ""),
+                    "child_session_id": result["session_id"],
+                    "checkpoint_id": checkpoint["checkpoint_id"],
+                    "completed_at": journal["completed_at"],
+                }
+            ),
+        )
+        runtime.session_path = runtime.session_store.save(runtime.session)
+        runtime.session_event_bus.emit("rollback_completed", result)
+    except Exception as error:
+        recovery_error = None
+        try:
+            _restore_manifest(runtime, recovery_files, current)
+        except Exception as exc:
+            recovery_error = exc
+        failed_child_session_id = ""
+        if runtime.session.get("id") != parent.get("id"):
+            failed_child = copy.deepcopy(runtime.session)
+            failed_child_session_id = str(failed_child.get("id", ""))
+            failed_child.setdefault("branch", {}).update(
+                {
+                    "status": "rollback_failed",
+                    "workspace_restored": False,
+                    "operation_id": operation_id,
+                    "failed_at": now(),
+                }
+            )
+            try:
+                runtime.session_store.save(failed_child)
+            except Exception as exc:
+                if recovery_error is None:
+                    recovery_error = exc
+        try:
+            runtime.session = copy.deepcopy(parent)
+            _rebind(runtime, emit_started=False)
+        except Exception as exc:
+            if recovery_error is None:
+                recovery_error = exc
+        if failed_child_session_id:
+            journal["failed_child_session_id"] = failed_child_session_id
+        status = (
+            "recovery_failed"
+            if recovery_error is not None
+            else "recovered_after_failure"
+        )
+        failure = _record_rollback_failure(
+            runtime,
+            recovery_root,
+            journal,
+            status=status,
+            error=error,
+            workspace_recovered=recovery_error is None,
+            recovery_error=recovery_error,
+        )
+        if recovery_error is not None:
+            raise SessionBranchError(
+                f"rollback and automatic recovery failed; inspect {failure['recovery_path']}"
+            ) from recovery_error
+        raise SessionBranchError(
+            f"rollback failed; original workspace restored; inspect {failure['recovery_path']}"
+        ) from error
     return result
 

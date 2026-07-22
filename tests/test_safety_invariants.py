@@ -1,7 +1,11 @@
+import json
 import os
 import shlex
+import subprocess
 import sys
 from unittest.mock import patch
+
+import pytest
 
 from niko_agent.testing import ScriptedModelClient
 from niko_agent import Niko, SessionStore, WorkspaceContext
@@ -11,7 +15,14 @@ from niko_agent.core.task_state import TaskState
 
 def build_workspace(tmp_path):
     (tmp_path / "README.md").write_text("demo\n", encoding="utf-8")
-    return WorkspaceContext.build(tmp_path)
+    return WorkspaceContext.build(tmp_path, repo_root_override=tmp_path)
+
+
+def python_command(script):
+    argv = [sys.executable, "-c", script]
+    if os.name == "nt":
+        return subprocess.list2cmdline(argv)
+    return shlex.join(argv)
 
 
 def build_agent(tmp_path, outputs, **kwargs):
@@ -39,7 +50,10 @@ def test_workspace_escape_is_rejected(tmp_path):
 def test_symlink_path_traversal_is_rejected(tmp_path):
     outside = tmp_path.parent / f"{tmp_path.name}-outside.txt"
     outside.write_text("outside\n", encoding="utf-8")
-    (tmp_path / "linked.txt").symlink_to(outside)
+    try:
+        (tmp_path / "linked.txt").symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"symlink creation is unavailable: {exc}")
     agent = build_agent(tmp_path, [])
 
     result = agent.run_tool("read_file", {"path": "linked.txt"})
@@ -121,6 +135,90 @@ def test_cli_build_agent_loads_project_env_secrets_before_redaction_setup(tmp_pa
         assert agent.secret_env_summary()["secret_env_names"] == ["NIKO_DEEPSEEK_API_KEY"]
 
 
+def test_cli_does_not_inherit_parent_workspace_config_or_env(tmp_path):
+    class DummyModelClient:
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+        def complete(self, prompt, max_new_tokens):
+            raise AssertionError("model should not be invoked")
+
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+    (workspace_root / "README.md").write_text("demo\n", encoding="utf-8")
+    (tmp_path / ".env").write_text(
+        "NIKO_API_KEY=parent-env-secret\n", encoding="utf-8"
+    )
+    (tmp_path / ".niko.toml").write_text(
+        'provider = "anthropic"\n', encoding="utf-8"
+    )
+    workspace = WorkspaceContext.build(
+        workspace_root, repo_root_override=workspace_root
+    )
+    args = niko_agent_cli.build_arg_parser().parse_args(
+        ["--cwd", str(workspace_root), "--approval", "auto"]
+    )
+
+    with (
+        patch.dict(os.environ, {}, clear=True),
+        patch("niko_agent.config.DEFAULT_CONFIG_PATH", tmp_path / "missing.toml"),
+        patch.object(niko_agent_cli.WorkspaceContext, "build", return_value=workspace),
+        patch(
+            "niko_agent.cli.AnthropicCompatibleModelClient",
+            side_effect=AssertionError("parent config must not select anthropic"),
+        ),
+        patch(
+            "niko_agent.cli.OpenAICompatibleModelClient",
+            side_effect=DummyModelClient,
+        ) as openai_client,
+    ):
+        agent = niko_agent_cli.build_agent(args)
+
+        assert "NIKO_API_KEY" not in os.environ
+        assert agent.model_client.kwargs["api_key"] == ""
+        openai_client.assert_called_once()
+
+
+def test_cli_provider_key_is_redacted_even_when_not_from_environment(tmp_path):
+    class DummyModelClient:
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+        def complete(self, prompt, max_new_tokens):
+            raise AssertionError("model should not be invoked")
+
+    secret = "config-only-secret-123"
+    (tmp_path / "README.md").write_text("demo\n", encoding="utf-8")
+    args = niko_agent_cli.build_arg_parser().parse_args(
+        ["--cwd", str(tmp_path), "--provider", "openai", "--api-key", secret]
+    )
+
+    with (
+        patch.dict(os.environ, {}, clear=True),
+        patch("niko_agent.config.DEFAULT_CONFIG_PATH", tmp_path / "missing.toml"),
+        patch(
+            "niko_agent.cli.OpenAICompatibleModelClient",
+            side_effect=DummyModelClient,
+        ),
+    ):
+        agent = niko_agent_cli.build_agent(args)
+
+    assert secret not in agent.prompt(f"diagnostic text {secret}")
+    assert agent.redact_artifact({"error": f"provider failed with {secret}"}) == {
+        "error": "provider failed with <redacted>"
+    }
+    assert secret not in json.dumps(agent.session)
+    agent.remember_durable_note(f"remember {secret}")
+    memory_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (tmp_path / ".niko" / "memory" / "logs").rglob("*.md")
+    )
+    assert secret not in memory_text
+    assert "<redacted>" in memory_text
+
+
 def test_cli_build_agent_reads_secret_names_from_environment_config(tmp_path):
     class DummyModelClient:
         def __init__(self, *args, **kwargs):
@@ -148,7 +246,7 @@ def test_run_shell_uses_allowlisted_environment_only(tmp_path):
     secret = "shh-allowlist-secret"
     agent = build_agent(tmp_path, [], approval_policy="auto")
     script = 'import os; print(os.getenv("MCA_ALLOWLIST_SECRET", "missing"))'
-    command = f"{shlex.quote(sys.executable)} -c {shlex.quote(script)}"
+    command = python_command(script)
 
     with patch.dict(os.environ, {"MCA_ALLOWLIST_SECRET": secret}, clear=False):
         result = agent.run_tool("run_shell", {"command": command, "timeout": 20})

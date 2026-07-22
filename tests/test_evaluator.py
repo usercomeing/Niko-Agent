@@ -1,4 +1,5 @@
 import json
+import locale as locale_module
 from pathlib import Path
 from collections import Counter
 
@@ -115,7 +116,7 @@ def test_run_fixed_benchmark_reports_metadata_and_success_definition(tmp_path):
         "max_new_tokens": 64,
     }
     assert reproducibility["timezone"] == "Asia/Shanghai"
-    assert reproducibility["locale"] == "C.UTF-8"
+    assert reproducibility["locale"] == locale_module.setlocale(locale_module.LC_CTYPE)
 
     for row in artifact["rows"]:
         assert not row["fixture_copy_relpath"].startswith("/")
@@ -128,7 +129,7 @@ def test_run_fixed_benchmark_reports_metadata_and_success_definition(tmp_path):
         assert row["verifier_passed"] is True
         assert row["expected_artifact_exists"] is True
         assert row["non_failure_stop_reason"] is True
-        assert row["stop_reason"] == "final_answer_returned"
+        assert row["stop_reason"] == row["expected_stop_reason"]
 
 
 def test_run_fixed_benchmark_covers_recovery_and_durable_contract_rows(tmp_path):
@@ -184,6 +185,31 @@ def test_run_task_anchors_paths_to_fixture_copy_even_inside_repo_workspace():
     fixture_copy = Path(row["fixture_copy_relpath"])
     readme_path = fixture_copy / "README.md"
     assert "This fixture is a locked benchmark workspace." in readme_path.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("task_id", "resume_status", "stop_reason"),
+    [
+        ("freshness_reanchor_resume", "partial-stale", "final_answer_returned"),
+        ("workspace_mismatch_resume", "workspace-mismatch", "unsafe_resume_state"),
+    ],
+)
+def test_recovery_resume_tasks_use_current_checkpoint_contract(
+    tmp_path, task_id, resume_status, stop_reason
+):
+    evaluator = BenchmarkEvaluator(
+        benchmark_path=Path("benchmarks/coding_tasks.json"),
+        artifact_path=tmp_path / "benchmark-v1.json",
+        workspace_root=tmp_path / "workspaces",
+    )
+    task = next(item for item in evaluator.load()["tasks"] if item["id"] == task_id)
+
+    row = evaluator.run_task(task)
+
+    assert row["passed"] is True, row["verifier_stderr"]
+    assert row["report"]["prompt_metadata"]["resume_status"] == resume_status
+    assert row["stop_reason"] == stop_reason
+    assert row["expected_stop_reason"] == stop_reason
 
 
 def test_summarize_rows_counts_failure_categories():

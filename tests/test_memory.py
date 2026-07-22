@@ -169,13 +169,14 @@ def test_kairos_memory_system_section_defines_file_contract_and_forget_policy(tm
     for memory_type in ("### user", "### feedback", "### project", "### reference"):
         assert memory_type in policy
     assert "If the user explicitly asks you to remember something, save it immediately" in policy
-    assert "If they ask you to forget something, find and remove the relevant entry" in policy
+    assert "record a forget request instead of adding a contradiction" in policy
     assert "name: {{memory name}}" in policy
     assert "description: {{one-line description" in policy
     assert "type: {{user | feedback | project | reference}}" in policy
     assert "MEMORY.md is an index, not a memory" in policy
     assert "Keep it under 200 lines" in policy
-    assert "You MUST access memory when the user explicitly asks you to recall or remember" in policy
+    assert "You MUST use the provided memory context" in policy
+    assert "Ordinary model tools cannot access `.niko/`" in policy
     assert "Code patterns, architecture, file paths" in policy
 
 

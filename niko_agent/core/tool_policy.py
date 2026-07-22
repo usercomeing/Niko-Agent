@@ -12,7 +12,12 @@ SHELL_SEARCH_RE = re.compile(
     r"(?:^|;|&&|\|\|)\s*(?:cat|less|head|tail|grep|rg|find|ls)(?:\s|$)"
 )
 SHELL_SENSITIVE_RE = re.compile(
-    r"(?:^|[\\/\s'\"])(?:\.niko|\.ssh|\.gnupg|\.env(?:\.[^\s'\"]+)?|"
+    r"(?:^|[\\/\s'\"])(?:\.niko|\.ssh|\.gnupg|\.aws[\\/]credentials|"
+    r"\.azure[\\/]accesstokens\.json|\.config[\\/]gcloud[\\/]"
+    r"(?:application_default_credentials\.json|credentials\.db)|"
+    r"\.docker[\\/]config\.json|\.kube[\\/]config|"
+    r"service-account[^\s'\"]*\.json|"
+    r"\.env(?:\.[^\s'\"]+)?|"
     + "|".join(re.escape(name) for name in sorted(SENSITIVE_BASENAMES))
     + r"|[^\s'\"]+(?:" + "|".join(re.escape(suffix) for suffix in SENSITIVE_SUFFIXES) + r"))(?:$|[\\/\s'\"])",
     re.IGNORECASE,

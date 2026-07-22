@@ -9,6 +9,7 @@ from .evaluator import run_fixed_benchmark
 from ..testing import ScriptedModelClient
 from ..providers import AnthropicCompatibleModelClient, OpenAICompatibleModelClient
 from ..core.runtime import Niko, SessionStore
+from ..core.runtime_checkpoints import CHECKPOINT_SCHEMA_VERSION
 from ..core.workspace import WorkspaceContext
 
 METRICS_SCHEMA_VERSION = 2
@@ -193,7 +194,9 @@ def build_stress_agent_metrics():
     with tempfile.TemporaryDirectory(prefix="niko_agent-metrics-") as temp_dir:
         workspace_root = Path(temp_dir)
         (workspace_root / "README.md").write_text("demo\n", encoding="utf-8")
-        workspace = WorkspaceContext.build(workspace_root)
+        workspace = WorkspaceContext.build(
+            workspace_root, repo_root_override=workspace_root
+        )
         store = SessionStore(workspace_root / ".niko" / "sessions")
         agent = Niko(
             model_client=ScriptedModelClient([]),
@@ -255,7 +258,9 @@ class _MemoryExperimentModelClient(ScriptedModelClient):
 
 
 def _build_memory_experiment_agent(workspace_root, expected_fact, filename):
-    workspace = WorkspaceContext.build(workspace_root)
+    workspace = WorkspaceContext.build(
+        workspace_root, repo_root_override=workspace_root
+    )
     store = SessionStore(workspace_root / ".niko" / "sessions")
     return Niko(
         model_client=_MemoryExperimentModelClient(expected_fact, filename),
@@ -451,7 +456,9 @@ def run_context_stress_matrix(repetitions=5):
                     with tempfile.TemporaryDirectory(prefix="niko_agent-context-matrix-") as temp_dir:
                         workspace_root = Path(temp_dir)
                         (workspace_root / "README.md").write_text("demo\n", encoding="utf-8")
-                        workspace = WorkspaceContext.build(workspace_root)
+                        workspace = WorkspaceContext.build(
+                            workspace_root, repo_root_override=workspace_root
+                        )
                         store = SessionStore(workspace_root / ".niko" / "sessions")
                         agent = Niko(
                             model_client=ScriptedModelClient([]),
@@ -521,7 +528,9 @@ def run_context_stress_matrix(repetitions=5):
 
 
 def _security_agent(workspace_root, approval_policy="auto", read_only=False):
-    workspace = WorkspaceContext.build(workspace_root)
+    workspace = WorkspaceContext.build(
+        workspace_root, repo_root_override=workspace_root
+    )
     store = SessionStore(workspace_root / ".niko" / "sessions")
     return Niko(
         model_client=ScriptedModelClient([]),
@@ -679,7 +688,9 @@ def _provider_summary_from_artifact(payload):
 
 
 def _provider_profile(provider):
-    config = resolve_provider_config(provider, start=Path.cwd())
+    config = resolve_provider_config(
+        provider, start=Path.cwd(), search_parents=False
+    )
     if not config.api_key:
         return {
             "provider": provider,
@@ -817,7 +828,9 @@ def _truncate_read_history(agent):
 
 
 def _build_real_agent(workspace_root, provider, approval_policy="auto", read_only=False):
-    workspace = WorkspaceContext.build(workspace_root)
+    workspace = WorkspaceContext.build(
+        workspace_root, repo_root_override=workspace_root
+    )
     store = SessionStore(workspace_root / ".niko" / "sessions")
     return Niko(
         model_client=_make_provider_client(provider),
@@ -1331,7 +1344,9 @@ RECOVERY_ABLATION_TASKS = [
 
 
 def _build_recovery_agent(workspace_root, required_fragments):
-    workspace = WorkspaceContext.build(workspace_root)
+    workspace = WorkspaceContext.build(
+        workspace_root, repo_root_override=workspace_root
+    )
     store = SessionStore(workspace_root / ".niko" / "sessions")
     return Niko(
         model_client=_RecoveryScenarioModelClient(required_fragments, "recovery state restored."),
@@ -1358,7 +1373,7 @@ def _apply_recovery_setup(agent, task, workspace_root):
                 "ckpt_resume": {
                     "checkpoint_id": "ckpt_resume",
                     "parent_checkpoint_id": "",
-                    "schema_version": "phase1-v1",
+                    "schema_version": CHECKPOINT_SCHEMA_VERSION,
                     "created_at": "2026-04-15T08:00:00+00:00",
                     "current_goal": "Resume the benchmark task" if task["id"] == "checkpoint_resume_goal" else "Continue from the latest benchmark checkpoint",
                     "completed": ["Read sample.txt"],
@@ -1396,7 +1411,7 @@ def _apply_recovery_setup(agent, task, workspace_root):
                 "ckpt_stale": {
                     "checkpoint_id": "ckpt_stale",
                     "parent_checkpoint_id": "",
-                    "schema_version": "phase1-v1",
+                    "schema_version": CHECKPOINT_SCHEMA_VERSION,
                     "created_at": "2026-04-15T08:00:00+00:00",
                     "current_goal": "Recover from stale benchmark summaries",
                     "completed": [],
@@ -1423,7 +1438,7 @@ def _apply_recovery_setup(agent, task, workspace_root):
                 "ckpt_workspace": {
                     "checkpoint_id": "ckpt_workspace",
                     "parent_checkpoint_id": "",
-                    "schema_version": "phase1-v1",
+                    "schema_version": CHECKPOINT_SCHEMA_VERSION,
                     "created_at": "2026-04-15T08:00:00+00:00",
                     "current_goal": "Recover after workspace drift",
                     "completed": [],
@@ -1478,7 +1493,7 @@ def _apply_recovery_setup(agent, task, workspace_root):
                 "ckpt_partial": {
                     "checkpoint_id": "ckpt_partial",
                     "parent_checkpoint_id": "",
-                    "schema_version": "phase1-v1",
+                    "schema_version": CHECKPOINT_SCHEMA_VERSION,
                     "created_at": "2026-04-15T08:00:00+00:00",
                     "current_goal": "Recover after partial tool success",
                     "completed": [],

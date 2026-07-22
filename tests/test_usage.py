@@ -7,7 +7,7 @@ from niko_agent import Niko, SessionStore, WorkspaceContext
 
 def build_agent(tmp_path, outputs=None, **kwargs):
     (tmp_path / "README.md").write_text("demo\n", encoding="utf-8")
-    workspace = WorkspaceContext.build(tmp_path)
+    workspace = WorkspaceContext.build(tmp_path, repo_root_override=tmp_path)
     return Niko(
         model_client=ScriptedModelClient(outputs or []),
         workspace=workspace,

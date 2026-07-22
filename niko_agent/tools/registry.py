@@ -4,16 +4,23 @@
 如何做参数校验，以及最终如何执行，都是在这里定义的。
 """
 
-import shutil
+import os
 import subprocess
 import textwrap
 from functools import partial
 
 from pydantic import ValidationError
 
-from ..core.workspace import IGNORED_PATH_NAMES
-from ..core.sensitive_paths import is_sensitive_path, require_non_sensitive_path
+from ..core.sensitive_paths import require_non_sensitive_path
 from .base import RegisteredTool
+from .file_tools import (
+    is_active_dream_memory_access,
+    tool_list_files,
+    tool_patch_file,
+    tool_read_file,
+    tool_search,
+    tool_write_file,
+)
 from .agents import (
     AGENT_TOOL_EXAMPLES,
     AGENT_TOOL_NAMES,
@@ -161,8 +168,14 @@ def validate_tool(agent, name, args):
 
     # Workspace-aware checks that require the agent (path safety, file state).
     if name in {"list_files", "read_file", "search", "write_file", "patch_file"}:
-        if not _is_active_plan_write(agent, name, args.get("path", ".")):
-            require_non_sensitive_path(args.get("path", "."))
+        raw_path = args.get("path", ".")
+        internal_access = _is_active_plan_write(
+            agent, name, raw_path
+        ) or is_active_dream_memory_access(agent, name, raw_path)
+        if not internal_access:
+            require_non_sensitive_path(raw_path)
+            resolved_path = agent.path(raw_path)
+            require_non_sensitive_path(resolved_path.relative_to(agent.root))
 
     if name == "list_files":
         path = agent.path(args.get("path", "."))
@@ -210,88 +223,6 @@ def _is_active_plan_write(agent, name, raw_path):
     return agent.path(raw_path) == agent.path(plan_path)
 
 
-def tool_list_files(agent, args):
-    path = agent.path(args.get("path", "."))
-    if not path.is_dir():
-        raise ValueError("path is not a directory")
-    entries = [
-        item
-        for item in sorted(
-            path.iterdir(), key=lambda item: (item.is_file(), item.name.lower())
-        )
-        if item.name not in IGNORED_PATH_NAMES
-        and not is_sensitive_path(item.relative_to(agent.root))
-    ]
-    lines = []
-    for entry in entries[:200]:
-        kind = "[D]" if entry.is_dir() else "[F]"
-        lines.append(f"{kind} {entry.relative_to(agent.root)}")
-    return "\n".join(lines) or "(empty)"
-
-
-def tool_read_file(agent, args):
-    path = agent.path(args["path"])
-    if not path.is_file():
-        raise ValueError("path is not a file")
-    start = int(args.get("start", 1))
-    end = int(args.get("end", 200))
-    if start < 1 or end < start:
-        raise ValueError("invalid line range")
-    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    body = "\n".join(
-        f"{number:>4}: {line}"
-        for number, line in enumerate(lines[start - 1 : end], start=start)
-    )
-    return f"# {path.relative_to(agent.root)}\n{body}"
-
-
-def tool_search(agent, args):
-    pattern = str(args.get("pattern", "")).strip()
-    if not pattern:
-        raise ValueError("pattern must not be empty")
-    path = agent.path(args.get("path", "."))
-
-    if shutil.which("rg"):
-        # 优先用 rg，因为搜索会非常频繁，搜索延迟会直接影响 agent 控制循环。
-        result = subprocess.run(
-            [
-                "rg", "-n", "--smart-case", "--max-count", "200",
-                "--glob", "!.niko/**", "--glob", "!.env", "--glob", "!.env.*",
-                "--glob", "!*.pem", "--glob", "!*.key", pattern, str(path),
-            ],
-            cwd=agent.root,
-            capture_output=True,
-            text=True,
-        )
-        return result.stdout.strip() or result.stderr.strip() or "(no matches)"
-
-    matches = []
-    files = (
-        [path]
-        if path.is_file()
-        else [
-            item
-            for item in path.rglob("*")
-            if item.is_file()
-            and not is_sensitive_path(item.relative_to(agent.root))
-            and not any(
-                part in IGNORED_PATH_NAMES
-                for part in item.relative_to(agent.root).parts
-            )
-        ]
-    )
-    for file_path in files:
-        for number, line in enumerate(
-            file_path.read_text(encoding="utf-8", errors="replace").splitlines(),
-            start=1,
-        ):
-            if pattern.lower() in line.lower():
-                matches.append(f"{file_path.relative_to(agent.root)}:{number}:{line}")
-                if len(matches) >= 200:
-                    return "\n".join(matches)
-    return "\n".join(matches) or "(no matches)"
-
-
 def tool_run_shell(agent, args):
     command = str(args.get("command", "")).strip()
     if not command:
@@ -301,16 +232,27 @@ def tool_run_shell(agent, args):
         raise ValueError("timeout must be in [1, 120]")
     runner = getattr(agent, "sandbox_runner", None)
     if runner is None:
+        shell_env = agent.shell_env()
+        command_value = command
+        use_shell = True
+        executable = None
+        if os.name == "nt" and shell_env.get("ComSpec"):
+            executable = shell_env["ComSpec"]
+            command_value = (
+                f'{subprocess.list2cmdline([executable])} /d /s /c "{command}"'
+            )
+            use_shell = False
         result = subprocess.run(
-            command,
+            command_value,
             cwd=agent.root,
-            shell=True,
+            shell=use_shell,
             capture_output=True,
             text=True,
             timeout=timeout,
+            executable=executable,
             # 这里传入的是过滤后的环境变量，而不是直接继承整个父 shell 环境，
             # 目的是减少敏感信息被意外带进命令执行环境的风险。
-            env=agent.shell_env(),
+            env=shell_env,
         )
     else:
         result = runner.run(
@@ -328,31 +270,6 @@ def tool_run_shell(agent, args):
         {result.stderr.strip() or "(empty)"}
         """
     ).strip()
-
-
-def tool_write_file(agent, args):
-    path = agent.path(args["path"])
-    content = str(args["content"])
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
-    return f"wrote {path.relative_to(agent.root)} ({len(content)} chars)"
-
-
-def tool_patch_file(agent, args):
-    path = agent.path(args["path"])
-    if not path.is_file():
-        raise ValueError("path is not a file")
-    old_text = str(args.get("old_text", ""))
-    if not old_text:
-        raise ValueError("old_text must not be empty")
-    if "new_text" not in args:
-        raise ValueError("missing new_text")
-    text = path.read_text(encoding="utf-8")
-    count = text.count(old_text)
-    if count != 1:
-        raise ValueError(f"old_text must occur exactly once, found {count}")
-    path.write_text(text.replace(old_text, str(args["new_text"]), 1), encoding="utf-8")
-    return f"patched {path.relative_to(agent.root)}"
 
 
 _TOOL_RUNNERS = {

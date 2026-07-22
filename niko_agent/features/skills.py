@@ -66,10 +66,15 @@ def discover_skills(root, home=None):
 
     skills = {skill.name: skill for skill in bundled_skills()}
     search_roots = [
-        (Path(home or Path.home()) / ".niko" / "skills", "user"),
         (Path(root) / "skills", "project"),
         (Path(root) / ".niko" / "skills", "project"),
     ]
+    try:
+        user_home = Path(home).expanduser() if home else Path.home()
+    except (OSError, RuntimeError):
+        user_home = None
+    if user_home is not None:
+        search_roots.insert(0, (user_home / ".niko" / "skills", "user"))
     for directory, source in search_roots:
         for skill in load_skills_from_dir(directory, source=source):
             skills[skill.name] = skill
