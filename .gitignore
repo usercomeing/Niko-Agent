@@ -48,6 +48,7 @@ docs/**
 !docs/memory.md
 !docs/skills.md
 !docs/sandbox.md
+!docs/runtime-artifacts.md
 
 # OS files
 .DS_Store

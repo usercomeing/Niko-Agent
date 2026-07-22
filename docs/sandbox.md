@@ -1,6 +1,6 @@
 # Sandbox
 
-niko_agent 的 `run_shell` 工具可以在 [bubblewrap](https://github.com/containers/bubblewrap) 沙盒里执行命令，把模型的影响范围控制在仓库目录里。
+Niko 的 `run_shell` 工具可以在 [bubblewrap](https://github.com/containers/bubblewrap) 沙盒里执行命令，把模型的影响范围控制在仓库目录里。
 
 ## 三种模式
 
@@ -17,7 +17,9 @@ niko --sandbox required
 
 ## 安装 bubblewrap
 
-仅 Linux 支持 bubblewrap 模式。macOS / Windows 上 sandbox 只能保持 `off`。
+仅 Linux 支持 bubblewrap 后端。macOS / Windows 上选择 `required` 会安全拒绝
+`run_shell`；选择 `best_effort` 会记录 `sandbox_unavailable` 降级事件后按普通
+子进程执行。该降级模式不是 OS 级隔离。
 
 ```bash
 sudo apt install bubblewrap        # Debian/Ubuntu
@@ -63,6 +65,6 @@ deny_write = []            # 显式拒绝写入的路径
 
 ## 推荐配置
 
-- 在不熟悉的项目里跑 niko_agent：`--sandbox best_effort --approval ask`
+- 在不熟悉的项目里跑 Niko：`niko --sandbox best_effort --approval ask`
 - 在自己长期维护的项目：`--sandbox off --approval auto`
 - 跑 CI 或自动化场景：`--sandbox required --approval never`

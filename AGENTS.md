@@ -24,3 +24,9 @@ Use four-space indentation, UTF-8, type hints where they clarify boundaries, `sn
 ## Commits, Pull Requests, and Security
 
 Follow Conventional Commits, such as `feat(recovery): add rollback preview`, `fix(eval): handle Windows verifier`, or `docs: record gate status`. Pull requests must explain intent, security implications, commands run, remaining failures, and visible UI changes. Never commit `.env`, API keys, `.niko.toml`, `.niko/`, private keys, or provider responses containing secrets.
+
+## Agent Work Protocol
+
+- Never run destructive or high-risk operations (for example, `rm -rf`) without the user's explicit prior approval.
+- At the start of every new session, read `progress.txt` first. After each completed feature and before ending a session, update it with four sections: completed, in progress, next, and known bugs.
+- Before starting a task or a new work phase, write or update `lesson.md` with the feature to build, its business context, and the expected outcome so humans and AI share the same context.
