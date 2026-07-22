@@ -11,10 +11,10 @@
 - 最新 full gate：Ruff 通过，337 passed，5 skipped（151.57 秒）；Gate8 离线真实会话 9/9 通过；deterministic evaluation 12/12 通过，pass rate 与 verifier pass rate 均为 100%。
 - CLI smoke：`python -m niko_agent --help` 通过；`git diff --check` 通过；常见真实密钥格式扫描无命中。
 - 已创建本地里程碑提交：`53d9e33`（安全/恢复/运行时）与 `d8718d6`（有界 verifier）。
+- 已提交最终文档与交付证据：`d3a646c`。
 
 进行中
-- 提交最终文档与交付记录。
-- 等待用户决定是否授权真实 provider 最小烟测、GitHub push，以及是否终止 4 个早期超时遗留进程。
+- 本地离线开发与交付已完成，等待用户决定是否授权真实 provider 最小烟测、GitHub push，以及是否终止 4 个早期超时遗留进程。
 
 接下来
 - 如获单独授权，仅执行一次最小真实 provider 烟测，不输出或复用密钥。
