@@ -22,6 +22,7 @@ from .workspace import clip, now
 CHECKPOINT_NONE_STATUS = "no-checkpoint"
 CHECKPOINT_PARTIAL_STALE_STATUS = "partial-stale"
 CHECKPOINT_WORKSPACE_MISMATCH_STATUS = "workspace-mismatch"
+UNSAFE_RESUME_STOP_REASON = "unsafe_resume_state"
 
 
 class Engine:
@@ -158,18 +159,19 @@ class Engine:
                         ),
                     },
                 )
-                checkpoint = agent.create_checkpoint(
-                    task_state, user_message, trigger="workspace_mismatch"
-                )
-                agent.run_store.write_task_state(task_state)
-                agent.emit_trace(
+                yield from finish_stopped_run(
+                    self,
                     task_state,
-                    "checkpoint_created",
-                    {
-                        "checkpoint_id": checkpoint["checkpoint_id"],
-                        "trigger": "workspace_mismatch",
-                    },
+                    user_message,
+                    (
+                        "Cannot safely resume: the checkpoint does not match the current "
+                        "workspace. Niko will not guess missing state. Re-anchor the task "
+                        "from verified files or start a new session."
+                    ),
+                    UNSAFE_RESUME_STOP_REASON,
+                    run_started_at,
                 )
+                return
             if prompt_metadata.get("budget_reductions"):
                 checkpoint = agent.create_checkpoint(
                     task_state, user_message, trigger="context_reduction"

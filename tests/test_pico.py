@@ -1440,9 +1440,12 @@ def test_resume_records_runtime_identity_mismatch_fields_in_metadata_and_trace(t
         feature_flags={"memory": True, "relevant_memory": False},
     )
 
-    resumed.ask("Continue the task")
+    answer = resumed.ask("Continue the task")
 
     assert resumed.last_prompt_metadata["resume_status"] == "workspace-mismatch"
+    assert "will not guess missing state" in answer
+    assert resumed.current_task_state.stop_reason == "unsafe_resume_state"
+    assert resumed.model_client.prompts == []
     assert resumed.last_prompt_metadata["runtime_identity_mismatch_fields"] == [
         "approval_policy",
         "feature_flags",

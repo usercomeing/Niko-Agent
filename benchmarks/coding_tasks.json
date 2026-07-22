@@ -112,12 +112,12 @@
     },
     {
       "id": "workspace_mismatch_resume",
-      "prompt": "Resume after benchmark workspace drift and rebuild runtime state.",
+      "prompt": "Resume after benchmark workspace drift. Refuse safely if checkpoint state cannot be trusted; do not guess or modify files.",
       "fixture_repo": "tests/fixtures/bench_repo_readme",
       "allowed_tools": ["read_file"],
       "step_budget": 3,
-      "expected_artifact": "README.md exists after workspace mismatch recovery",
-      "verifier": "python3 -c \"import json; from pathlib import Path; report = json.loads(next(Path('.niko/runs').glob('*/report.json')).read_text(encoding='utf-8')); trace = [json.loads(line) for line in next(Path('.niko/runs').glob('*/trace.jsonl')).read_text(encoding='utf-8').splitlines()]; assert report['prompt_metadata']['resume_status'] == 'workspace-mismatch'; assert any(event.get('event') == 'runtime_identity_mismatch' for event in trace)\"",
+      "expected_artifact": "README.md remains unchanged while unsafe resume fails closed",
+      "verifier": "python3 -c \"import json; from pathlib import Path; report = json.loads(next(Path('.niko/runs').glob('*/report.json')).read_text(encoding='utf-8')); trace = [json.loads(line) for line in next(Path('.niko/runs').glob('*/trace.jsonl')).read_text(encoding='utf-8').splitlines()]; text = Path('README.md').read_text(encoding='utf-8'); assert report['prompt_metadata']['resume_status'] == 'workspace-mismatch'; assert report['stop_reason'] == 'unsafe_resume_state'; assert report['tool_steps'] == 0; assert 'This is a placeholder benchmark fixture.' in text; assert any(event.get('event') == 'runtime_identity_mismatch' for event in trace); assert not any(event.get('event') == 'model_requested' for event in trace)\"",
       "category": "recovery",
       "setup": {
         "kind": "workspace_mismatch"

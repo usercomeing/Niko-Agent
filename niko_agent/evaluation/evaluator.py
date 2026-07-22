@@ -360,6 +360,7 @@ def _apply_task_setup(agent, task, fixture_copy_root):
         }
         agent.session_store.save(agent.session)
         (fixture_copy_root / path).write_text(str(setup.get("mutated_text", "alpha\nbeta\nstale-updated\nplaceholder\n")), encoding="utf-8")
+        agent.resume_state = agent.evaluate_resume_state()
         return
 
     if kind == "workspace_mismatch":
@@ -376,6 +377,7 @@ def _apply_task_setup(agent, task, fixture_copy_root):
             },
         }
         agent.session_store.save(agent.session)
+        agent.resume_state = agent.evaluate_resume_state()
         return
 
 
