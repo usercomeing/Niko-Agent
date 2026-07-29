@@ -111,3 +111,11 @@
 
 - 本阶段只读取 GitHub 元数据和本地提交图，未推送、创建 PR、关闭/删除分支、修改保护规则或合并。
 - 后续 push/PR 会公开当前完成分支的 11 个提交及其 71 个文件差异；合并、删除远程分支和修改保护规则属于可见且不可逆性较高的远程操作，须按顺序执行并留证。
+
+### 远程交付结果
+
+- 已创建并推送 `work/niko-v1-completion`，远程跟踪分支已建立。
+- 已创建 [PR #2：feat: complete Niko v1 delivery](https://github.com/usercomeing/Niko-Agent/pull/2)，目标为 `main`。
+- PR #2 创建时为 `OPEN`、`CLEAN`、`MERGEABLE`，创建时快照包含 12 个提交、71 个文件、2,801 行新增和 353 行删除；尚未收到评审决定。
+- GitHub 未报告任何 PR check 或 Actions 运行。原因是仓库没有 `.github/` workflow，不能把“无检查”描述成“CI 已通过”；PR 正文保留了本地 full gate 的完整证据。
+- 未合并 PR、未删除 `work/niko-v1-recovery-eval`、未变更 `main` 保护规则或仓库设置。
