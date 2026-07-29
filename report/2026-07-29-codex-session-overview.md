@@ -125,3 +125,4 @@
 - 在 PR 状态记录 `630f813` 推送后，GitHub 返回 PR #2 已合并。复核的 merge commit 为 `0c872fe3e3cc2e846272ad2733de867ffdb6a9f3`，合并时间为 2026-07-29 13:21:11，合并者为用户账号 `usercomeing`。
 - 本 Agent 未发送合并命令。合并提交的第二父提交为 `0e151c6`，所以 v1 的所有产品代码、测试、二开结果文档和 GitHub 审计已进入 `main`。
 - `630f813 docs: record v1 pull request status` 在合并后才推送，当前只在 completion 分支上，属于文档状态同步，不包含产品改动。为避免强制推送或改写历史，将通过后续小型文档 PR 交付。
+- 已创建 [PR #3：docs: record Niko v1 merge completion](https://github.com/usercomeing/Niko-Agent/pull/3)，该 PR 仅包含 `630f813`、`57d57b3` 及随后状态记录的文档同步；不会自动合并。
