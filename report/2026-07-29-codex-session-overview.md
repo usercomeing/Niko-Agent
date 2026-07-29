@@ -126,3 +126,22 @@
 - 本 Agent 未发送合并命令。合并提交的第二父提交为 `0e151c6`，所以 v1 的所有产品代码、测试、二开结果文档和 GitHub 审计已进入 `main`。
 - `630f813 docs: record v1 pull request status` 在合并后才推送，当前只在 completion 分支上，属于文档状态同步，不包含产品改动。为避免强制推送或改写历史，将通过后续小型文档 PR 交付。
 - 已创建 [PR #3：docs: record Niko v1 merge completion](https://github.com/usercomeing/Niko-Agent/pull/3)，该 PR 仅包含 `630f813`、`57d57b3` 及随后状态记录的文档同步；不会自动合并。
+
+### PR #3 合并与远程分支清理
+
+- 用户确认后，已由本 Agent 合并 PR #3；merge commit 为 `c0e8b9c515d5d82b926e41b86bf20c575adacd5c`。
+- 先以 `merge-base --is-ancestor` 确认 `work/niko-v1-recovery-eval` 和 `work/niko-v1-completion` 都已被 `main` 包含，再删除两个远程分支；当前远程只保留 `main` 与 `feature/niko-v1`。
+- 未删除本地 completion worktree 或 `feature/niko-v1` 基线；没有强制推送或历史改写。
+
+## GitHub 治理基线阶段
+
+### 目标与设计
+
+- 在独立 `work/repository-governance` 分支新增 `.github/workflows/ci.yml`：使用当前官方稳定的 checkout v7、setup-python v7 与 setup-uv v9，在 PR 和 `main` 推送上运行 `uv sync --dev` 与完整离线门禁。
+- 新增 `.github/pull_request_template.md`，固定收集目的、主要改动、quick/full/deterministic 验证、安全与兼容性、可见变更和遗留项。
+- 由于仓库尚无 `uv.lock`，CI 会根据 `pyproject.toml` 的范围解析依赖；锁文件不在本次最小治理 PR 中伪造，作为独立的可复现性决策保留。
+
+### 后续步骤
+
+- 推送治理分支并创建 PR，观察实际 workflow 的 check 名称和结果。
+- 仅在 workflow 通过并获得真实 check 名称后，为 `main` 配置必须经 PR、必须通过 full offline gate、禁止强推/删除且不要求额外人工审批的保护规则。
