@@ -1,24 +1,21 @@
 已完成
-- 已按《Niko-Agent v1 二次开发计划》完成 Niko 品牌、唯一 `niko` CLI、`.niko/` 状态目录、`.niko.toml` 与 `NIKO_*` 配置接口的交付审计。
-- 已完成敏感路径统一保护、`/fork`/checkpoint/`/rollback` 两阶段恢复、workspace fingerprint fail-closed、Windows shell 启动兼容、运行证据脱敏、memory/skills/sandbox、worker 与离线验证能力；详细设计和证据见 `docs/二开结果文档.md`。
-- 2026-07-29 已在当前源码 worktree 复跑 full 离线门禁：Ruff 通过，pytest `337 passed, 5 skipped`（仅 1 个 `.pytest_cache` 权限警告）；Gate8 9/9；deterministic evaluation 12/12。
-- 已完成 `docs/二开结果文档.md`：包含模块地图、运行/恢复数据流、10 个功能记录、需求—实现追溯、验证证据、提交历史、已知限制与 v2 候选项；未改动产品代码、测试样例或 fixture。
-- 已完成 GitHub 仓库审计：管理员账号已认证；无开放 issue；`main` 未受保护；PR #1 的 recovery 分支已合并；仓库未配置 GitHub Actions/PR check。
-- [PR #2](https://github.com/usercomeing/Niko-Agent/pull/2) 已由用户账号合并到 `main`，merge commit 为 `0c872fe`；其中包含完整 v1 产品代码、测试和交付/审计文档。主分支现为 v1 的远程交付基线。
-- 已创建仅文档的 [PR #3](https://github.com/usercomeing/Niko-Agent/pull/3)，同步 PR #2 合并后产生的状态记录；不包含产品代码、测试、依赖或配置变更。
+- 已按《Niko-Agent v1 二次开发计划》完成 Niko 品牌、唯一 `niko` CLI、`.niko/` 状态目录、`.niko.toml` 与 `NIKO_*` 配置接口的交付审计；完整离线门禁为 Ruff 通过、pytest `337 passed, 5 skipped`、Gate8 9/9、deterministic evaluation 12/12。
+- 已完成完整二开结果文档、会话报告和 GitHub 仓库审计。
+- PR #2 已合并完整 v1；PR #3 已合并合并状态文档。`main` 当前为 `c0e8b9c`，是 v1 远程交付基线。
+- 已验证并删除远程 `work/niko-v1-recovery-eval` 与 `work/niko-v1-completion`；远程仅保留 `main` 和 `feature/niko-v1`。
+- 已从最新 `main` 创建 `work/repository-governance`，新增完整离线门禁 workflow、PR 模板和治理阶段说明；尚未推送/创建治理 PR。
 
 进行中
-- PR #3 正等待用户审阅和明确合并确认；本项目不自动合并到 `main`。
+- GitHub 治理基线：准备推送 workflow/PR 模板，创建治理 PR，验证首次 Actions 完整离线门禁，并以实际 check 名称保护 `main`。
 - Windows 超长路径下的 session event 持久化加固明确暂不实施，保留为 v2 计划候选项。
 
 接下来
-- 获得用户确认后合并 PR #3；随后复核 `main`。
-- 在明确授权下删除已合并的 `work/niko-v1-recovery-eval`；PR #3 合并后按需要清理 `work/niko-v1-completion`。保留 `feature/niko-v1`。
-- 单独确认 CI workflow、PR 模板和 `main` 分支保护的 required checks/审批数，再实施仓库治理设置。
-- 仓库状态稳定后，与用户确认 v2 的业务目标、优先级、边界、验收标准和里程碑，再创建 v2 精简计划。
+- 推送 `work/repository-governance` 并创建治理 PR；CI 通过后配置 `main` 为必须经 PR、必须通过 full-offline-gate、禁止强推和删除，当前单管理员仓库不要求额外人工审批。
+- 仓库治理稳定后，与用户确认 v2 的业务目标、优先级、边界、验收标准和里程碑，再创建 v2 精简计划。
+- 在独立决策中评估是否生成并提交 `uv.lock`，以提高 CI 依赖解析的可复现性。
 
 已知bug
 - 当前离线交付门禁没有已知功能失败。
 - 在经典 Windows 路径限制下，超长临时根会使 `.niko/sessions/<session-id>.events.jsonl` 路径超过约 260 字符；短临时根下完整门禁通过。用户已要求本轮不修复，待 v2 计划决定是否加固。
 - 当前 Windows 主机没有创建符号链接的权限，相关安全测试按设计跳过；其他符号链接逻辑由可用平台测试覆盖。
-- 当前 Git 对象库不包含历史 Pico 基线 `4adae0b`，当前命令环境没有 `uv` 可执行文件；两项均不影响已通过的本地 full gate，但需在有材料/授权时补验。
+- 当前 Git 对象库不包含历史 Pico 基线 `4adae0b`，当前仓库没有 `uv.lock`；两项均不影响已通过的本地 full gate，但后者使 CI 首次依赖解析不完全锁定。
