@@ -119,3 +119,9 @@
 - PR #2 创建时为 `OPEN`、`CLEAN`、`MERGEABLE`，创建时快照包含 12 个提交、71 个文件、2,801 行新增和 353 行删除；尚未收到评审决定。
 - GitHub 未报告任何 PR check 或 Actions 运行。原因是仓库没有 `.github/` workflow，不能把“无检查”描述成“CI 已通过”；PR 正文保留了本地 full gate 的完整证据。
 - 未合并 PR、未删除 `work/niko-v1-recovery-eval`、未变更 `main` 保护规则或仓库设置。
+
+### 合并状态复核
+
+- 在 PR 状态记录 `630f813` 推送后，GitHub 返回 PR #2 已合并。复核的 merge commit 为 `0c872fe3e3cc2e846272ad2733de867ffdb6a9f3`，合并时间为 2026-07-29 13:21:11，合并者为用户账号 `usercomeing`。
+- 本 Agent 未发送合并命令。合并提交的第二父提交为 `0e151c6`，所以 v1 的所有产品代码、测试、二开结果文档和 GitHub 审计已进入 `main`。
+- `630f813 docs: record v1 pull request status` 在合并后才推送，当前只在 completion 分支上，属于文档状态同步，不包含产品改动。为避免强制推送或改写历史，将通过后续小型文档 PR 交付。

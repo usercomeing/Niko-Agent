@@ -4,17 +4,17 @@
 - 2026-07-29 已在当前源码 worktree 复跑 full 离线门禁：Ruff 通过，pytest `337 passed, 5 skipped`（仅 1 个 `.pytest_cache` 权限警告）；Gate8 9/9；deterministic evaluation 12/12。
 - 已完成 `docs/二开结果文档.md`：包含模块地图、运行/恢复数据流、10 个功能记录、需求—实现追溯、验证证据、提交历史、已知限制与 v2 候选项；未改动产品代码、测试样例或 fixture。
 - 已完成 GitHub 仓库审计：管理员账号已认证；无开放 issue；`main` 未受保护；PR #1 的 recovery 分支已合并；仓库未配置 GitHub Actions/PR check。
-- 已推送 `work/niko-v1-completion` 并创建 [PR #2](https://github.com/usercomeing/Niko-Agent/pull/2)（→ `main`）：创建时为 `OPEN`、`CLEAN`、`MERGEABLE`；创建时快照为 12 个提交、71 个文件、2,801 行新增、353 行删除；尚无评审决定和自动检查。
+- [PR #2](https://github.com/usercomeing/Niko-Agent/pull/2) 已由用户账号合并到 `main`，merge commit 为 `0c872fe`；其中包含完整 v1 产品代码、测试和交付/审计文档。主分支现为 v1 的远程交付基线。
 
 进行中
-- PR #2 正等待用户审阅和明确合并确认；本项目不自动合并到 `main`。
+- 合并后的状态记录 `630f813` 及本次合并复核文档尚未进入 `main`；仅含文档，不含产品代码，将创建小型后续文档 PR，同样不自动合并。
 - Windows 超长路径下的 session event 持久化加固明确暂不实施，保留为 v2 计划候选项。
 
 接下来
-- 获得用户确认后合并 PR #2；合并后复核 `main`、再在明确授权下删除已合并的 `work/niko-v1-recovery-eval`，按需要清理 completion 分支。
+- 推送合并复核文档并创建仅文档的后续 PR；获得用户确认后才合并。
+- 在明确授权下删除已合并的 `work/niko-v1-recovery-eval`；在状态文档 PR 合并后按需要清理 `work/niko-v1-completion`。保留 `feature/niko-v1`。
 - 单独确认 CI workflow、PR 模板和 `main` 分支保护的 required checks/审批数，再实施仓库治理设置。
 - 仓库状态稳定后，与用户确认 v2 的业务目标、优先级、边界、验收标准和里程碑，再创建 v2 精简计划。
-- 如获授权安装 `uv`，原样复跑计划中的 quick、full 与 deterministic 三个 `uv run ...` 入口；真实 Provider smoke 仍需单独授权。
 
 已知bug
 - 当前离线交付门禁没有已知功能失败。
