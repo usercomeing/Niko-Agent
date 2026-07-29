@@ -1,5 +1,7 @@
 # Niko-Agent
 
+[English](README.en.md) | 简体中文
+
 轻量、本地、白盒可审计的终端 Coding Agent。
 
 Niko 在当前 Git 仓库中运行，提供 TUI、REPL 和 one-shot CLI；模型提出动作，本地 runtime 负责参数校验、权限判断、敏感路径保护、工具执行和证据落盘。Session、run、checkpoint、memory 与 rollback recovery 全部保存在项目私有目录 `.niko/`。
@@ -102,5 +104,6 @@ niko_agent/
 └── tui/           Textual 界面
 ```
 
-更多说明见 `docs/`。许可证和来源见 [LICENSE](LICENSE) 与 [NOTICE](NOTICE)。
-
+更多说明见 `docs/`，运行工件与审计链路见
+[docs/runtime-artifacts.md](docs/runtime-artifacts.md)。许可证和来源见
+[LICENSE](LICENSE) 与 [NOTICE](NOTICE)。

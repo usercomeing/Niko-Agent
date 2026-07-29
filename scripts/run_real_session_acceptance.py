@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
+import subprocess
 import sys
 from pathlib import Path
 
@@ -22,6 +24,12 @@ from niko_agent.providers import AnthropicCompatibleModelClient, OpenAICompatibl
 SUMMARY_JSON = "gate8-real-session-acceptance.json"
 SUMMARY_MARKDOWN = "gate8-real-session-acceptance.md"
 LIVE_ENV_FLAG = "NIKO_ACCEPTANCE_LIVE"
+
+
+def _shell_command(argv):
+    if os.name == "nt":
+        return subprocess.list2cmdline([str(item) for item in argv])
+    return shlex.join([str(item) for item in argv])
 
 
 def run_acceptance(output_dir, include_live=None):
@@ -115,13 +123,14 @@ def _scenario_bugfix_pytest(output_dir, workspace):
         "from src.calculator import add\n\n\ndef test_adds_numbers():\n    assert add(2, 3) == 5\n",
         encoding="utf-8",
     )
+    pytest_command = _shell_command([sys.executable, "-m", "pytest", "-q"])
     agent = _build_agent(
         workspace,
         [
             '<tool>{"name":"read_file","args":{"path":"tests/test_calculator.py","start":1,"end":20}}</tool>',
             '<tool>{"name":"read_file","args":{"path":"src/calculator.py","start":1,"end":20}}</tool>',
             '<tool name="patch_file" path="src/calculator.py"><old_text>return a - b</old_text><new_text>return a + b</new_text></tool>',
-            '<tool>{"name":"run_shell","args":{"command":"uv run --with pytest python -m pytest -q","timeout":60}}</tool>',
+            f'<tool>{{"name":"run_shell","args":{{"command":{json.dumps(pytest_command)},"timeout":60}}}}</tool>',
             "<final>Bug fixed and tests pass.</final>",
         ],
         max_steps=6,
@@ -276,7 +285,7 @@ def _scenario_resume_continuation(output_dir, workspace):
         session_store=store,
         session_id=first.session["id"],
         approval_policy="auto",
-        max_steps=4,
+        max_steps=3,
     )
     answer = resumed.ask("Resume and finish the task")
     events = _read_events(resumed)
@@ -419,7 +428,7 @@ def _scenario_live_provider_smoke(output_dir, workspace, include_live=None):
     live_enabled = include_live is True or os.environ.get(LIVE_ENV_FLAG, "").strip().lower() in {"1", "true", "yes"}
     if not live_enabled:
         return _skipped_record(output_dir, workspace, "live_provider_smoke", f"set {LIVE_ENV_FLAG}=1 to enable live provider smoke")
-    config = resolve_provider_config(start=workspace)
+    config = resolve_provider_config(start=workspace, search_parents=False)
     if not config.api_key:
         return _skipped_record(output_dir, workspace, "live_provider_smoke", f"provider {config.name} has no api key")
     _write_readme(workspace, "Gate8 live provider fixture.\n")

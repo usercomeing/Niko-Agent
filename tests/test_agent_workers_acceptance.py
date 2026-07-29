@@ -8,7 +8,8 @@ from niko_agent import Niko, SessionStore, WorkspaceContext
 
 def build_agent(tmp_path, outputs, **kwargs):
     (tmp_path / "README.md").write_text("demo readme\n", encoding="utf-8")
-    workspace = WorkspaceContext.build(tmp_path)
+    workspace = WorkspaceContext.build(tmp_path, repo_root_override=tmp_path)
+    assert workspace.repo_root == str(tmp_path.resolve())
     store = SessionStore(tmp_path / ".niko" / "sessions")
     return Niko(
         model_client=ScriptedModelClient(outputs),
@@ -217,6 +218,9 @@ def test_explore_agent_runs_real_readonly_child_session_and_records_notification
     )
 
     assert agent.ask("inspect with a subagent") == "Exploration complete."
+    assert agent.workspace.repo_root == str(tmp_path.resolve())
+    child = agent.worker_manager._tasks["agent_1"].runtime
+    assert child.workspace.repo_root == str(tmp_path.resolve())
 
     notifications = [
         item

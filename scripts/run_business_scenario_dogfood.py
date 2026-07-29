@@ -297,6 +297,7 @@ def _build_client_factory(*, config_path=None, provider=None, model=None, base_u
         provider,
         start=ROOT,
         config_path=config_path,
+        search_parents=False,
         model=model,
         base_url=base_url,
         api_key=api_key,

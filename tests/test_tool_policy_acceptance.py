@@ -1,14 +1,17 @@
 import json
+import os
 import shlex
+import subprocess
 import sys
 
 from niko_agent.testing import ScriptedModelClient
 from niko_agent import Niko, SessionStore, WorkspaceContext
+from niko_agent.core.tool_policy import ToolPolicyChecker
 
 
 def build_agent(tmp_path, outputs=None, **kwargs):
     (tmp_path / "README.md").write_text("hello world\n", encoding="utf-8")
-    workspace = WorkspaceContext.build(tmp_path)
+    workspace = WorkspaceContext.build(tmp_path, repo_root_override=tmp_path)
     store = SessionStore(tmp_path / ".niko" / "sessions")
     return Niko(
         model_client=ScriptedModelClient(outputs or []),
@@ -17,6 +20,13 @@ def build_agent(tmp_path, outputs=None, **kwargs):
         approval_policy="auto",
         **kwargs,
     )
+
+
+def python_command(script):
+    argv = [sys.executable, "-c", script]
+    if os.name == "nt":
+        return subprocess.list2cmdline(argv)
+    return shlex.join(argv)
 
 
 def read_jsonl(path):
@@ -144,8 +154,10 @@ def test_shell_policy_allows_head_tail_grep_after_pipe(tmp_path):
         "python3 --version 2>&1 | head -3",
         "echo a; echo b | grep b",
     ):
-        result = agent.run_tool("run_shell", {"command": command, "timeout": 20})
-        assert "exit_code: 0" in result, f"command should run, got: {result[:200]}"
+        decision = ToolPolicyChecker(agent).check(
+            agent.tools["run_shell"], {"command": command, "timeout": 20}
+        )
+        assert decision.allowed, decision.message
 
     rejected_after_seq = agent.run_tool(
         "run_shell", {"command": "echo a; cat README.md", "timeout": 20}
@@ -156,7 +168,7 @@ def test_shell_policy_allows_head_tail_grep_after_pipe(tmp_path):
 
 def test_long_shell_output_is_clipped_and_full_output_is_saved_as_run_artifact(tmp_path):
     script = "print('x'*6000)"
-    command = f"{shlex.quote(sys.executable)} -c {shlex.quote(script)}"
+    command = python_command(script)
     agent = build_agent(
         tmp_path,
         [

@@ -896,4 +896,3 @@ find .niko/memory -maxdepth 3 -type f | sort
 杩欎釜瀹氫綅姣旀ā鍨嬭嚜鍔ㄦ€荤粨鏇村噯纭紝涔熸洿鑳借В閲婁负浠€涔堜唬鐮侀噷浼氭湁 memory directory銆乨aily logs銆乼opic files銆乪ntrypoint index銆乤uto gate銆乴ock銆乨ream profile銆亀rite_scope 鍜屽悗鍙扮嚎绋嬨€?
 
 褰撳墠瀹炵幇宸茬粡鎶婅繖鏉′富绾胯窇閫氥€傚悗闈㈡渶鍊煎緱琛ョ殑涓嶆槸鏇村 prompt锛岃€屾槸鏇寸‖鐨勪换鍔＄敓鍛藉懆鏈熴€佹洿濂界殑骞跺彂鎺у埗銆佺粨鏋勫寲 report銆乵emory lint锛屼互鍙婂湪闇€瑕佹椂寮曞叆鍊欓€?output store銆?
-

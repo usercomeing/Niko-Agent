@@ -129,7 +129,7 @@ def run_tool(agent, name, args):
 
 
 def _render_tool_result(agent, name, full_result):
-    full_result = str(full_result)
+    full_result = agent.redact_text(str(full_result))
     if name != "run_shell" or len(full_result) <= INLINE_TOOL_OUTPUT_LIMIT:
         return clip(full_result), ""
     if not getattr(agent, "current_task_state", None):

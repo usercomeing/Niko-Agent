@@ -19,6 +19,7 @@ def build_child_runtime(parent, subagent_type, write_scope):
         read_only=subagent_type == "Explore"
         or (subagent_type == "worker" and not write_scope),
         secret_env_names=parent.secret_env_names,
+        secret_values=parent.secret_values,
         shell_env_allowlist=parent.shell_env_allowlist,
         feature_flags=parent.feature_flags,
         write_scope=write_scope,

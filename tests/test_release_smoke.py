@@ -23,7 +23,7 @@ def _build_workspace(tmp_path):
         "# demo\n\nQuick Start coming soon.\n", encoding="utf-8"
     )
     (tmp_path / "TODO").write_text("- [ ] write docs\n", encoding="utf-8")
-    return WorkspaceContext.build(tmp_path)
+    return WorkspaceContext.build(tmp_path, repo_root_override=tmp_path)
 
 
 def _build_agent(tmp_path, outputs):
@@ -137,7 +137,9 @@ def test_dream_produces_non_empty_topics_with_live_provider(tmp_path):
     workspace = _build_workspace(tmp_path)
     store = SessionStore(tmp_path / ".niko" / "sessions")
 
-    config = resolve_provider_config(None, start=str(tmp_path))
+    config = resolve_provider_config(
+        None, start=str(tmp_path), search_parents=False
+    )
     client_cls = (
         OpenAICompatibleModelClient if config.protocol == "openai" else AnthropicCompatibleModelClient
     )

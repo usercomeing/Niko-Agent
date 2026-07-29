@@ -1,6 +1,6 @@
 # 分层记忆 + Auto-dream
 
-niko_agent 的记忆系统让 agent **跨 session 保持对项目的认知**。不是把整个对话历史塞回 prompt，而是分四层落地，每层有自己的生命周期。
+Niko 的记忆系统让 agent **跨 session 保持对项目的认知**。不是把整个对话历史塞回 prompt，而是分四层落地，每层有自己的生命周期。
 
 ## 为什么需要分层
 
@@ -54,7 +54,7 @@ Saved to daily log.
 
 ### `<memory>...</memory>` — agent 在 final answer 里自动追加
 
-模型在回答里裹一对 `<memory>` 标签，niko_agent 自动 append 到当天的 daily log。
+模型在回答里裹一对 `<memory>` 标签，Niko 自动 append 到当天的 daily log。
 
 ### 后台 auto-dream — 自动整合
 
@@ -64,7 +64,9 @@ Saved to daily log.
 - 至少有 5 个新 session（`--dream-min-sessions`）
 - 当前没有正在跑的 dream
 
-后台启一个隔离的 niko_agent 实例（write_scope 限制在 `.niko/memory/`），把 daily log + 最近 session ID 一起喂给模型，让它写 / 更新 topic 文件和 MEMORY.md。
+后台启一个隔离的 Niko dream 实例（工具 profile 与 write_scope 都限制在
+`.niko/memory/`），让它整理 daily log 并写入或更新 topic 文件和 MEMORY.md。
+原始 session transcript 路径不会提供给 dream 模型。
 
 ### `/dream` — 手动触发
 
@@ -82,7 +84,9 @@ Consolidation complete. Wrote 2 topic updates, refreshed index.
 1. **memory section** — working memory + MEMORY.md 索引（让模型知道有哪些长期记忆可查）
 2. **relevant_memory section** — 根据当前用户请求做关键词检索，从 daily log 和 topic 里挑最相关的 3 条
 
-模型也可以手动 `read_file .niko/memory/topics/<name>.md` 读完整 topic。
+普通模型工具不能直接读取 `.niko/`。Niko 只把经过整理的 MEMORY.md 索引和
+相关 durable notes 注入 prompt；用户可用 `/memory` 查看索引。只有内部 dream
+profile 能访问 `.niko/memory/`，且仍会拒绝其中的 `.env`、私钥等敏感文件。
 
 ## 用户可见命令
 
@@ -101,11 +105,11 @@ Consolidation complete. Wrote 2 topic updates, refreshed index.
 niko --no-auto-dream     # 只关 auto-dream，保留 /remember /dream
 ```
 
-或者在 toml / 启动时设 `feature_flags.memory = false`，但**不推荐**——这是 niko_agent 区别于其他 coding agent 的核心能力。
+或者在嵌入式 runtime 配置中设 `feature_flags.memory = false`，但**不推荐**——这是 Niko 区别于其他 coding agent 的核心能力。
 
 ## 文件级 freshness 保护
 
-在 patch_file / write_file 之前，niko_agent 会检查"是否最近 read 过这个文件"（通过 sha256 freshness）。如果没读过就改，会被 `prior_read_required` 拒绝。这层保护和 memory feature flag **解耦**——即便 memory 关闭，read freshness 也仍然追踪，避免 agent 改盲文件。
+在 patch_file / write_file 之前，Niko 会检查"是否最近 read 过这个文件"（通过 sha256 freshness）。如果没读过就改，会被 `prior_read_required` 拒绝。这层保护和 memory feature flag **解耦**——即便 memory 关闭，read freshness 也仍然追踪，避免 agent 改盲文件。
 
 ## 故障排查
 
@@ -118,7 +122,7 @@ niko --no-auto-dream     # 只关 auto-dream，保留 /remember /dream
 
 ## 推荐的工作流
 
-1. 第一次进项目：让 niko_agent 跑 `/skills`、看 README、用 `/remember` 写下 1-2 条该仓库的关键约定。
+1. 第一次进项目：让 Niko 跑 `/skills`、看 README、用 `/remember` 写下 1-2 条该仓库的关键约定。
 2. 每天工作结束：`/dream` 一次，把当天观察沉淀。
 3. 切换分支或一段时间没用：直接 `niko --resume latest`，让它从工作记忆 + topic 里恢复上下文。
 

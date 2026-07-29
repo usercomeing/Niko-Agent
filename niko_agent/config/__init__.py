@@ -153,30 +153,32 @@ def _parse_env_line(line):
     return name, _strip_quotes(value)
 
 
-def find_project_env(start):
+def find_project_env(start, *, search_parents=True):
     current = Path(start).resolve()
     if current.is_file():
         current = current.parent
-    for path in (current, *current.parents):
+    paths = (current, *current.parents) if search_parents else (current,)
+    for path in paths:
         env_path = path / ".env"
         if env_path.exists():
             return env_path
     return None
 
 
-def find_project_config(start):
+def find_project_config(start, *, search_parents=True):
     current = Path(start).resolve()
     if current.is_file():
         current = current.parent
-    for path in (current, *current.parents):
+    paths = (current, *current.parents) if search_parents else (current,)
+    for path in paths:
         config_path = path / PROJECT_CONFIG_NAME
         if config_path.exists():
             return config_path
     return None
 
 
-def load_project_env(start, override=True):
-    env_path = find_project_env(start)
+def load_project_env(start, override=True, *, search_parents=True):
+    env_path = find_project_env(start, search_parents=search_parents)
     if env_path is None:
         return {}
     loaded = {}
@@ -207,9 +209,14 @@ def resolve_provider_config(
     model: str | None = None,
     base_url: str | None = None,
     api_key: str | None = None,
+    search_parents: bool = True,
 ) -> ProviderConfig:
-    file_values = _load_config_values(start=start, explicit_path=config_path)
-    legacy_env = _load_legacy_env_values(start)
+    file_values = _load_config_values(
+        start=start,
+        explicit_path=config_path,
+        search_parents=search_parents,
+    )
+    legacy_env = _load_legacy_env_values(start, search_parents=search_parents)
 
     requested_provider = (
         provider
@@ -277,8 +284,13 @@ def resolve_project_sandbox_config(
     config_path: str | None = None,
     mode: str | None = None,
     backend: str | None = None,
+    search_parents: bool = True,
 ):
-    file_values = _load_config_values(start=start, explicit_path=config_path)
+    file_values = _load_config_values(
+        start=start,
+        explicit_path=config_path,
+        search_parents=search_parents,
+    )
     values = {"sandbox": dict(file_values.get("sandbox", {}) or {})}
     if mode:
         values["sandbox"]["mode"] = mode
@@ -292,7 +304,12 @@ def normalize_provider_name(provider: str | None) -> str:
     return PROVIDER_ALIASES.get(normalized, normalized)
 
 
-def _load_config_values(start: str | Path, explicit_path: str | None) -> dict[str, Any]:
+def _load_config_values(
+    start: str | Path,
+    explicit_path: str | None,
+    *,
+    search_parents: bool = True,
+) -> dict[str, Any]:
     values: dict[str, Any] = {"top": {}, "providers": {}, "sandbox": {}}
     if explicit_path:
         _merge_config_values(
@@ -300,7 +317,8 @@ def _load_config_values(start: str | Path, explicit_path: str | None) -> dict[st
         )
         return values
 
-    for path in (DEFAULT_CONFIG_PATH, find_project_config(start)):
+    project_config = find_project_config(start, search_parents=search_parents)
+    for path in (DEFAULT_CONFIG_PATH, project_config):
         if path and path.exists():
             _merge_config_values(values, _read_config_file(path))
     return values
@@ -351,8 +369,10 @@ def _profile_values(
     return values
 
 
-def _load_legacy_env_values(start: str | Path) -> dict[str, str]:
-    env_path = find_project_env(start)
+def _load_legacy_env_values(
+    start: str | Path, *, search_parents: bool = True
+) -> dict[str, str]:
+    env_path = find_project_env(start, search_parents=search_parents)
     if env_path is None:
         return {}
     loaded = {}

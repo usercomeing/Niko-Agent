@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 
 from ..features import memory as memorylib
 from ..testing import ScriptedModelClient
-from ..core.runtime import Niko, SessionStore
+from ..core.runtime import CHECKPOINT_SCHEMA_VERSION, Niko, SessionStore
 from ..core.run_store import RunStore
 from ..core.task_state import STOP_REASON_FINAL_ANSWER_RETURNED
 from ..core.workspace import WorkspaceContext
@@ -281,7 +281,7 @@ def _checkpoint_payload(
     next_step,
     runtime_identity,
     *,
-    schema_version=BENCHMARK_SCHEMA_VERSION,
+    schema_version=CHECKPOINT_SCHEMA_VERSION,
     current_blocker="",
     key_files=None,
     freshness=None,
@@ -290,7 +290,7 @@ def _checkpoint_payload(
     return {
         "checkpoint_id": checkpoint_id,
         "parent_checkpoint_id": "",
-        "schema_version": "phase1-v1" if schema_version == BENCHMARK_SCHEMA_VERSION else str(schema_version),
+        "schema_version": str(schema_version),
         "created_at": "2026-04-15T08:00:00+00:00",
         "current_goal": current_goal,
         "completed": [],
@@ -511,7 +511,10 @@ class BenchmarkEvaluator:
 
         within_budget = task_state.tool_steps <= int(task["step_budget"])
         verifier_passed = verifier.returncode == 0
-        non_failure_stop_reason = task_state.stop_reason == STOP_REASON_FINAL_ANSWER_RETURNED
+        expected_stop_reason = str(
+            task.get("expected_stop_reason", STOP_REASON_FINAL_ANSWER_RETURNED)
+        )
+        non_failure_stop_reason = task_state.stop_reason == expected_stop_reason
         passed = within_budget and verifier_passed and expected_artifact_exists and non_failure_stop_reason
         failure_category = None if passed else self._failure_category(
             within_budget=within_budget,
@@ -551,6 +554,7 @@ class BenchmarkEvaluator:
             "attempts": task_state.attempts,
             "final_answer": final_answer,
             "stop_reason": task_state.stop_reason,
+            "expected_stop_reason": expected_stop_reason,
             "initial_history_empty": initial_history_empty,
             "initial_memory_empty": initial_memory_empty,
             "initial_task_summary_empty": initial_task_summary_empty,

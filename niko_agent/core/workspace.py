@@ -42,7 +42,17 @@ def middle(text, limit):
 
 
 class WorkspaceContext:
-    def __init__(self, cwd, repo_root, branch, default_branch, status, recent_commits, project_docs):
+    def __init__(
+        self,
+        cwd,
+        repo_root,
+        branch,
+        default_branch,
+        status,
+        recent_commits,
+        project_docs,
+        git_available=False,
+    ):
         self.cwd = cwd
         self.repo_root = repo_root
         self.branch = branch
@@ -50,18 +60,31 @@ class WorkspaceContext:
         self.status = status
         self.recent_commits = recent_commits
         self.project_docs = project_docs
+        self.git_available = bool(git_available)
 
     @classmethod
     def build(cls, cwd, repo_root_override=None):
         cwd = Path(cwd).resolve()
+        git_cwd = (
+            Path(repo_root_override).resolve()
+            if repo_root_override is not None
+            else cwd
+        )
 
         def git(args, fallback=""):
+            # An explicit root is an isolation boundary. In particular, a copied
+            # benchmark fixture must not inherit an unrelated Git repository from
+            # one of its parent directories.
+            if repo_root_override is not None and not (git_cwd / ".git").exists():
+                return fallback
             try:
                 result = subprocess.run(
                     ["git", *args],
-                    cwd=cwd,
+                    cwd=git_cwd,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     check=True,
                     timeout=5,
                 )
@@ -70,7 +93,7 @@ class WorkspaceContext:
                 return fallback
 
         repo_root = (
-            Path(repo_root_override).resolve()
+            git_cwd
             if repo_root_override is not None
             else Path(git(["rev-parse", "--show-toplevel"], str(cwd))).resolve()
         )
@@ -97,6 +120,7 @@ class WorkspaceContext:
             status=clip(git(["status", "--short"], "clean") or "clean", 1500),
             recent_commits=[line for line in git(["log", "--oneline", "-5"]).splitlines() if line],
             project_docs=docs,
+            git_available=(repo_root / ".git").exists(),
         )
 
     def text(self):
@@ -130,5 +154,6 @@ class WorkspaceContext:
             "status": self.status,
             "recent_commits": list(self.recent_commits),
             "project_docs": dict(self.project_docs),
+            "git_available": self.git_available,
         }
         return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()

@@ -11,7 +11,7 @@ from niko_agent.features import skills as skillslib
 
 def build_agent(tmp_path, outputs):
     (tmp_path / "README.md").write_text("demo\n", encoding="utf-8")
-    workspace = WorkspaceContext.build(tmp_path)
+    workspace = WorkspaceContext.build(tmp_path, repo_root_override=tmp_path)
     return Niko(
         model_client=ScriptedModelClient(outputs),
         workspace=workspace,
@@ -142,6 +142,7 @@ def test_dream_slash_command_consolidates_daily_log_into_memory_files(tmp_path):
     assert "Prefers concise reports" in (tmp_path / ".niko" / "memory" / "topics" / "user-preferences.md").read_text(encoding="utf-8")
     # dream prompt 是发给 dream 子 agent 的，加了 read step 后总 prompt 数 +1，索引相应调整
     assert "Dream: Memory Consolidation" in agent.model_client.prompts[-4]
+    assert str(tmp_path / ".niko" / "sessions") not in agent.model_client.prompts[-4]
 
 
 def test_dream_cannot_write_outside_memory_directory(tmp_path):

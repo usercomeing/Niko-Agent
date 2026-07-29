@@ -48,6 +48,8 @@ docs/**
 !docs/memory.md
 !docs/skills.md
 !docs/sandbox.md
+!docs/runtime-artifacts.md
+!docs/二开结果文档.md
 
 # OS files
 .DS_Store

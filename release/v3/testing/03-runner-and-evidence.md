@@ -175,4 +175,3 @@ uv run python scripts/run_v3_human_scenario_gate.py --suite full --output-dir /t
 ```text
 {"failed": 0, "output_dir": "/private/tmp/niko_agent-v3-human-scenarios/20260513-170838", "passed": 50, "status": "passed"}
 ```
-

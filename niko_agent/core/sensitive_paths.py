@@ -14,7 +14,10 @@ SENSITIVE_BASENAMES = {
     ".pypirc",
     ".git-credentials",
     ".niko.toml",
+    "credentials",
     "credentials.json",
+    "application_default_credentials.json",
+    "accesstokens.json",
     "auth.json",
     "secrets.json",
     "secrets.yaml",
@@ -23,6 +26,14 @@ SENSITIVE_BASENAMES = {
 }
 ALLOWED_ENV_TEMPLATES = {".env.example", ".env.sample", ".env.template"}
 SENSITIVE_SUFFIXES = (".pem", ".key", ".p12", ".pfx", ".jks", ".keystore")
+SENSITIVE_PARENT_CHILDREN = {
+    (".aws", "credentials"),
+    (".azure", "accesstokens.json"),
+    (".config/gcloud", "application_default_credentials.json"),
+    (".config/gcloud", "credentials.db"),
+    (".docker", "config.json"),
+    (".kube", "config"),
+}
 
 
 def normalized_parts(raw_path) -> tuple[str, ...]:
@@ -40,12 +51,9 @@ def sensitive_path_reason(raw_path) -> str:
         return ""
     if any(part in {".niko", ".ssh", ".gnupg"} for part in parts):
         return "sensitive_path"
-    for parent, child in zip(parts, parts[1:]):
-        if (parent, child) in {
-            (".aws", "credentials"),
-            (".docker", "config.json"),
-            (".kube", "config"),
-        }:
+    joined = "/".join(parts)
+    for parent, child in SENSITIVE_PARENT_CHILDREN:
+        if joined == f"{parent}/{child}" or joined.endswith(f"/{parent}/{child}"):
             return "sensitive_path"
     leaf = parts[-1]
     if leaf in ALLOWED_ENV_TEMPLATES:
@@ -67,4 +75,3 @@ def is_sensitive_path(raw_path) -> bool:
 def require_non_sensitive_path(raw_path):
     if is_sensitive_path(raw_path):
         raise ValueError("sensitive path is not available to model tools")
-

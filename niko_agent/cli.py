@@ -81,8 +81,8 @@ def _configured_secret_names(args):
     return sorted(configured_secret_names)
 
 
-def _build_model_client(args):
-    config = resolve_provider_config(
+def _build_model_client(args, config=None):
+    config = config or resolve_provider_config(
         getattr(args, "provider", None),
         start=getattr(args, "cwd", "."),
         config_path=getattr(args, "config", None),
@@ -179,16 +179,17 @@ def build_agent(args):
     store = SessionStore(workspace.repo_root + "/.niko/sessions")
     provider_config = resolve_provider_config(
         getattr(args, "provider", None),
-        start=getattr(args, "cwd", "."),
+        start=workspace.repo_root,
         config_path=getattr(args, "config", None),
         model=getattr(args, "model", None),
         base_url=getattr(args, "base_url", None),
         api_key=getattr(args, "api_key", None),
+        search_parents=False,
     )
-    model = _build_model_client(args)
+    model = _build_model_client(args, provider_config)
 
     def model_client_factory():
-        return _build_model_client(args)
+        return _build_model_client(args, provider_config)
 
     if args.max_new_tokens is None:
         args.max_new_tokens = default_max_tokens_for_provider(provider_config.name)
@@ -198,8 +199,13 @@ def build_agent(args):
         config_path=getattr(args, "config", None),
         mode=getattr(args, "sandbox", None),
         backend=getattr(args, "sandbox_backend", None),
+        search_parents=False,
     )
-    load_project_env(workspace.repo_root, override=False)
+    load_project_env(
+        workspace.repo_root,
+        override=False,
+        search_parents=False,
+    )
     configured_secret_names = _configured_secret_names(args)
     session_id = args.resume
     if session_id == "latest":
@@ -219,6 +225,7 @@ def build_agent(args):
             max_steps=args.max_steps,
             max_new_tokens=args.max_new_tokens,
             secret_env_names=configured_secret_names,
+            secret_values=[provider_config.api_key],
             memory_dir=memory_dir,
             auto_dream=auto_dream,
             dream_interval_hours=dream_interval,
@@ -235,6 +242,7 @@ def build_agent(args):
         max_steps=args.max_steps,
         max_new_tokens=args.max_new_tokens,
         secret_env_names=configured_secret_names,
+        secret_values=[provider_config.api_key],
         memory_dir=memory_dir,
         auto_dream=auto_dream,
         dream_interval_hours=dream_interval,
@@ -445,8 +453,13 @@ def handle_repl_command(agent, user_input):
         return True, False, json.dumps(result, indent=2, sort_keys=True)
     if command_name == "rollback":
         try:
+            if command_args == "--confirm":
+                return True, False, "Usage: /rollback --confirm <token>"
             if command_args.startswith("--confirm "):
-                result = agent.confirm_rollback(command_args.split(None, 1)[1])
+                confirm_parts = command_args.split()
+                if len(confirm_parts) != 2:
+                    return True, False, "Usage: /rollback --confirm <token>"
+                result = agent.confirm_rollback(confirm_parts[1])
             else:
                 result = agent.preview_rollback(command_args or "latest")
                 result = dict(result, confirm=f"/rollback --confirm {result['token']}")

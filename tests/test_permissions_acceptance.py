@@ -9,7 +9,7 @@ from niko_agent.features.sandbox.config import SandboxConfig
 
 def build_agent(tmp_path, outputs=None, **kwargs):
     (tmp_path / "README.md").write_text("demo\n", encoding="utf-8")
-    workspace = WorkspaceContext.build(tmp_path)
+    workspace = WorkspaceContext.build(tmp_path, repo_root_override=tmp_path)
     store = SessionStore(tmp_path / ".niko" / "sessions")
     approval_policy = kwargs.pop("approval_policy", "auto")
     return Niko(

@@ -244,4 +244,3 @@ TUI/瀹℃壒/suggestion 鍙兘闈?Computer Use 鎴?Textual 娴嬭瘯鎵嶅�
 鎴戠殑鍒ゆ柇鏄細v3 鐨?acceptance 涓嶅簲璇ヨ拷姹傗€?0 涓兘鏄湡妯″瀷 live call鈥濄€傞偅浼氭祴鍑?provider 鎶栧姩锛屼笉浼氭洿濂藉湴娴嬪嚭 runtime銆傛纭仛娉曟槸鍏ュ彛鐪熶汉鍖栥€佽瘉鎹?runtime 鍖栥€乸rovider live 灏戦噺鎶芥牱銆?
 
 濡傛灉瑕佹帹缈昏繖涓垽鏂紝闇€瑕佽瘉鏄庣湡瀹炴ā鍨嬮殢鏈烘€ф湰韬氨鏄?v3 鐨勪富瑕侀闄╋紝鑰屼笉鏄?Engine銆乼ool policy銆乵emory銆乻ubagent 鍜?artifact 閾捐矾鐨勭ǔ瀹氭€с€?
-

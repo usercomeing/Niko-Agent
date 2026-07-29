@@ -49,6 +49,12 @@ def execute_tool_payload(engine, task_state, user_message, payload):
             "content": notification,
         }
     agent.run_store.write_task_state(task_state)
+    if tool_metadata.get("workspace_changed"):
+        # The next checkpoint must describe the state produced by this trusted
+        # tool call. Otherwise its pre-tool prefix fingerprint makes Niko treat
+        # its own write as external workspace drift on the next model step.
+        agent.refresh_prefix(force=True)
+        tool_metadata["workspace_fingerprint"] = agent.workspace.fingerprint()
     agent.emit_trace(
         task_state,
         "tool_executed",

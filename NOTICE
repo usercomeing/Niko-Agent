@@ -12,4 +12,3 @@ Design references reviewed during development:
 Niko-Agent's original changes include the Niko public interface, centralized
 sensitive-path protection, append-only session forks, token-confirmed Git-visible
 workspace rollback, recovery journals, and cross-platform verification entrypoints.
-

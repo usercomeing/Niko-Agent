@@ -1,6 +1,6 @@
 # 配置
 
-niko_agent 的配置按下面这个优先级合并：
+Niko 的配置按下面这个优先级合并：
 
 ```
 CLI 显式参数 > 环境变量 > 项目 .niko.toml > 全局 ~/.config/niko/config.toml > 代码默认
@@ -39,7 +39,7 @@ model = "claude-sonnet-4-6"
 切 provider：
 
 ```bash
-niko_agent                       # 用 toml 里的默认 provider
+niko                       # 用 toml 里的默认 provider
 niko --provider openai     # 临时切换
 niko --provider anthropic --model claude-opus-4-6
 ```

@@ -1,9 +1,20 @@
 """Runtime secret redaction and shell environment helpers."""
 
 import os
+from pathlib import Path
 
 SENSITIVE_ENV_NAME_MARKERS = ("API_KEY", "TOKEN", "SECRET", "PASSWORD")
 REDACTED_VALUE = "<redacted>"
+
+if os.name == "nt":
+    _SYSTEM_ROOT = os.environ.get("SystemRoot") or os.environ.get("WINDIR") or r"C:\Windows"
+    _WINDOWS_SHELL_ENV = {
+        "SystemRoot": _SYSTEM_ROOT,
+        "ComSpec": os.environ.get("ComSpec")
+        or str(Path(_SYSTEM_ROOT) / "System32" / "cmd.exe"),
+    }
+else:
+    _WINDOWS_SHELL_ENV = {}
 
 
 class RuntimeSecretsMixin:
@@ -36,7 +47,11 @@ class RuntimeSecretsMixin:
 
     def redact_text(self, text):
         text = str(text)
-        for _, value in sorted(self.detected_secret_env_items(), key=lambda item: len(item[1]), reverse=True):
+        values = {
+            value for _, value in self.detected_secret_env_items() if len(value) >= 4
+        }
+        values.update(getattr(self, "secret_values", ()))
+        for value in sorted(values, key=len, reverse=True):
             text = text.replace(value, REDACTED_VALUE)
         return text
 
@@ -55,6 +70,9 @@ class RuntimeSecretsMixin:
 
     def shell_env(self):
         env = {name: os.environ[name] for name in self.shell_env_allowlist if name in os.environ}
+        # Windows requires these non-secret bootstrap paths even when the caller
+        # deliberately supplies a minimal/cleared environment.
+        env.update({name: value for name, value in _WINDOWS_SHELL_ENV.items() if value})
         env["PWD"] = str(self.root)
         if "PATH" not in env and os.environ.get("PATH"):
             env["PATH"] = os.environ["PATH"]

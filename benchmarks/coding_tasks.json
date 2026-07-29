@@ -117,6 +117,7 @@
       "allowed_tools": ["read_file"],
       "step_budget": 3,
       "expected_artifact": "README.md remains unchanged while unsafe resume fails closed",
+      "expected_stop_reason": "unsafe_resume_state",
       "verifier": "python3 -c \"import json; from pathlib import Path; report = json.loads(next(Path('.niko/runs').glob('*/report.json')).read_text(encoding='utf-8')); trace = [json.loads(line) for line in next(Path('.niko/runs').glob('*/trace.jsonl')).read_text(encoding='utf-8').splitlines()]; text = Path('README.md').read_text(encoding='utf-8'); assert report['prompt_metadata']['resume_status'] == 'workspace-mismatch'; assert report['stop_reason'] == 'unsafe_resume_state'; assert report['tool_steps'] == 0; assert 'This is a placeholder benchmark fixture.' in text; assert any(event.get('event') == 'runtime_identity_mismatch' for event in trace); assert not any(event.get('event') == 'model_requested' for event in trace)\"",
       "category": "recovery",
       "setup": {

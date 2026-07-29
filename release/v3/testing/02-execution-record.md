@@ -1,8 +1,8 @@
 # Niko v3 真人场景全量执行记录
 
-执行日期：2026-05-13  
-执行分支：`v3`  
-默认 provider：`deepseek`  
+执行日期：2026-05-13
+执行分支：`v3`
+默认 provider：`deepseek`
 主计划文档：`release/v3/testing/01-test-design.md`
 
 ## 最终结论
@@ -85,7 +85,7 @@
 
 ### 3. 同参文件改写的重复拦截必须区分“补充信息后的重试”
 
-现象一：S23 中 DeepSeek 已经 `write_file VALUE=False`、`patch_file False->True`，之后又重放同一个 `write_file VALUE=False`，把成功 patch 回滚。  
+现象一：S23 中 DeepSeek 已经 `write_file VALUE=False`、`patch_file False->True`，之后又重放同一个 `write_file VALUE=False`，把成功 patch 回滚。
 现象二：直接把 `write_file/patch_file` 第二次同参调用全部拒绝后，S21 中“先被 prior_read_required 拒绝，补 `read_file` 后重试同一 patch”也被误拒。
 
 根因：重复调用规则只按“同参出现次数”判断，没有理解工具调用的状态语义。

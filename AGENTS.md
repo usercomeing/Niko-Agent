@@ -1,26 +1,44 @@
-# Repository Guidelines
+# Niko-Agent 项目指令
 
-## Project Structure & Module Organization
+## 优先级与范围
 
-The Python package lives in `niko_agent/`. Keep CLI entry points in `niko_agent/cli.py`, UI code in `niko_agent/tui/`, providers in `niko_agent/providers/`, tools in `niko_agent/tools/`, and runtime coordination in `niko_agent/core/`. Tests live in `tests/`; deterministic fixtures and task definitions belong in `benchmarks/`; verification and acceptance runners belong in `scripts/`. Store maintained documentation in `docs/` and dated development reports in `report/`. Do not commit runtime state from `.niko/`, virtual environments, caches, credentials, or generated evaluation artifacts.
+- 当前对话中用户最新、明确的指令优先；其次是安全约束和本文件，再是冻结计划、测试与历史文档。发现冲突必须指出。
+- 默认沿用所在模块的既有架构、命名、错误处理和依赖方向，保持最小必要 diff；不得为“顺手优化”扩大范围。
+- 架构、维护成本或用户体验存在显著取舍时，先给推荐方案和关键取舍，等待确认。
+- 新功能、跨模块改动、架构调整、安全/权限改动、依赖升级，或预计影响超过 5 个文件时，必须先提交精简计划并等待确认。
+- 默认保持 CLI、配置格式、公共 Python 接口与既有工作流兼容；破坏性变更须先说明影响、迁移和回滚方案并获确认。
 
-## Branch and Delivery Workflow
+## 结构与不可修改边界
 
-Develop on a child branch created from `feature/niko-v1`; do not work directly on `main` or the integration branch. Use small, reviewable commits at coherent milestones. Update a dated file under `report/` with completed work, verification evidence, known limitations, and the next action. Push each completed milestone to the matching GitHub branch only after local checks pass.
+- 业务代码位于 `niko_agent/`：CLI 在 `cli.py`，TUI 在 `tui/`，Provider 在 `providers/`，工具在 `tools/`，运行时协调在 `core/`。测试在 `tests/`，验证脚本在 `scripts/`。
+- `readme_intro_locked/`、`artifacts/evaluation/workspaces/` 与 `benchmarks/` 中既有样例及 fixture 均为只读，不得手工改写。
+- 根目录 `Niko-Agent v1 二次开发计划.md` 是冻结的原始需求基线，不得修改；实际实现和差异写入二开结果文档。
+- 已存在的 `report/*.md` 为历史会话报告，不得覆盖或回写。
+- `.niko/`、`.venv/`、缓存、`tmp/`、`.worktrees/`、`niko_agent.egg-info/` 和生成的评测产物不得手工编辑或提交；清理前先确认。
+- 可新增测试；修改既有测试、测试样例或 fixture 前必须先获得用户确认。
+- `README.md` 在 CLI、安装、配置、核心工作流、用户可见行为或限制变化时必须更新。
 
-## Build, Test, and Development Commands
+## 代码与 Git
 
-- `uv sync --dev` installs locked runtime and development dependencies.
-- `uv run niko --help` verifies the CLI entry point.
-- `uv run python scripts/verify.py --profile quick` runs lint and core offline tests.
-- `uv run python scripts/verify.py --profile full` runs the complete offline gate.
-- `uv run python scripts/evaluate.py --deterministic` runs scripted evaluation without a live provider.
-- `uv run ruff check niko_agent tests scripts` runs static checks directly.
+- 使用四空格缩进、UTF-8；边界处使用有意义的类型标注；函数和模块使用 `snake_case`，类使用 `PascalCase`。安全决策须显式，checkpoint、权限或 sandbox 状态不可用时 fail closed。
+- 默认在当前开发分支连续推进；并行或高风险任务可由主 agent 判断后创建独立分支/worktree。不得直接在 `main` 或集成分支开发。
+- 每个可验证里程碑创建一个 Conventional Commit。提交前必须审查 diff、兼容性、错误处理、安全边界、测试覆盖和文档同步。
+- 非当前任务的未提交或未跟踪内容视为用户资产：不得覆盖、删除、暂存或提交。
+- 本地检查、自审和文档同步完成后，可自动推送并创建 PR；合并到集成分支必须先获用户确认。执行远程操作前仍须说明影响。
+- 依赖变更只提交直接对应的锁文件更新；记录用途、版本、替代方案、风险和验证结果，不做无关依赖刷新。
 
-## Coding Style & Testing
+## 测试、Provider 与缺陷处理
 
-Use four-space indentation, UTF-8, type hints where they clarify boundaries, `snake_case` for functions and modules, and `PascalCase` for classes. Keep security decisions explicit and fail closed when checkpoint, permission, or sandbox state is unavailable. Tests use pytest and `pytest-asyncio`; name files `test_<feature>.py` and tests `test_<expected_behavior>`. Add regression coverage for every bug fix. Normal gates must not call live providers.
+- 小模块或小功能只运行受影响部分的测试。大规模模块协作、跨模块改动、架构调整、安全/权限改动、依赖升级或预计影响超过 5 个文件时，必须运行全量离线测试。
+- 常用命令：`uv sync --dev`、`uv run niko --help`、`uv run python scripts/verify.py --profile quick`、`uv run python scripts/verify.py --profile full`、`uv run python scripts/evaluate.py --deterministic`、`uv run ruff check niko_agent tests scripts`。
+- 核心逻辑、缺陷修复和高风险路径必须有测试；缺陷修复必须有回归覆盖。不得为测试绿灯绕过、硬编码或弱化真实行为。
+- 全量门禁失败必须优先修复；普通、不影响功能效果或 TUI 展示的问题可在开发完成后统一处理，并记录风险与计划。
+- 允许按需要联网、调用测试账号或真实 Provider；执行前说明账号、费用和数据外发风险，且不得提交凭据、响应或运行产物。
 
-## Commits, Pull Requests, and Security
+## 文档、会话与子 Agent
 
-Follow Conventional Commits, such as `feat(recovery): add rollback preview`, `fix(eval): handle Windows verifier`, or `docs: record gate status`. Pull requests must explain intent, security implications, commands run, remaining failures, and visible UI changes. Never commit `.env`, API keys, `.niko.toml`, `.niko/`, private keys, or provider responses containing secrets.
+- 在 `docs/二开结果文档.md` 持续维护项目架构与二开结果。每次 Git 提交必须同步更新对应功能模块，至少记录目标、背景、涉及文件、设计决策、实现流程、接口/数据流、测试命令与结果、风险/限制、关联提交和后续优化。
+- `report/` 每个 Codex 会话新建一份报告，同一会话持续追加，旧报告永不覆盖。报告必须包含目标、起止时间、需求/决策、完成项、修改文件、提交、命令与结果、问题/风险、未完成项、下一步及二开结果文档链接。
+- 每次新会话先读取 `progress.txt`；每个功能完成和会话结束前更新“已完成、进行中、接下来、已知 bug”。每项任务或新阶段开始前更新 `lesson.md`，说明目标、业务背景和预期结果。
+- 仅在任务可明确拆分、子任务独立且不会并发修改同一文件时启用子 agent。主 agent 负责规划、整合、验证和提交；子 agent 可修改其明确负责的独占范围。
+- 代码标识符与开源协作提交信息使用英文；二开结果文档、会话报告和面向用户的说明使用中文。

@@ -1,6 +1,6 @@
 # Skills
 
-Skill 是一段写在 markdown 文件里的可复用 prompt，可以通过 `/skill-name [args]` 调用。niko_agent 把它展开成一次普通 session 请求，沿用同一套工具、审批和事件链路。
+Skill 是一段写在 markdown 文件里的可复用 prompt，可以通过 `/skill-name [args]` 调用。Niko 把它展开成一次普通 session 请求，沿用同一套工具、审批和事件链路。
 
 ## 内置 skill
 
@@ -10,7 +10,7 @@ Skill 是一段写在 markdown 文件里的可复用 prompt，可以通过 `/ski
 - `/simplify` — 找代码冗余并修
 
 ```bash
-niko_agent
+niko
 > /review
 ↳ Bash(git diff) ✓
 代码审查：3 处可简化，1 处有遗漏的错误处理...
@@ -20,7 +20,7 @@ niko_agent
 
 后加载的同名 skill 覆盖前面的：
 
-1. **内置 skill** — niko_agent 自带
+1. **内置 skill** — Niko 自带
 2. **用户 skill** — `~/.niko/skills/<name>/SKILL.md`
 3. **项目 skill** — `<repo>/skills/<name>/SKILL.md` 或 `<repo>/.niko/skills/<name>/SKILL.md`
 

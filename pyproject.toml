@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "niko-agent"
 version = "0.1.0"
 description = "Local, white-box coding agent with safe recovery and auditable evidence"
+readme = "README.en.md"
 requires-python = ">=3.10"
 dependencies = [
   "pydantic>=2.0.0",

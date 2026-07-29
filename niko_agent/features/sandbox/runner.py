@@ -1,5 +1,6 @@
 """Optional shell sandbox runner."""
 
+import os
 import subprocess
 from pathlib import Path
 from shutil import which as default_which
@@ -46,15 +47,30 @@ class SandboxRunner:
 
     def _plain(self, command, *, cwd, env, timeout):
         run_process = self.run_process or subprocess.run
-        return run_process(
-            command,
-            cwd=cwd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=env,
-        )
+        if os.name == "nt" and env.get("ComSpec"):
+            comspec = env["ComSpec"]
+            command_line = (
+                f'{subprocess.list2cmdline([comspec])} /d /s /c "{command}"'
+            )
+            return run_process(
+                command_line,
+                cwd=cwd,
+                shell=False,
+                executable=comspec,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env=env,
+            )
+        kwargs = {
+            "cwd": cwd,
+            "shell": True,
+            "capture_output": True,
+            "text": True,
+            "timeout": timeout,
+            "env": env,
+        }
+        return run_process(command, **kwargs)
 
     def _bubblewrap_argv(self, backend_path, command, cwd, config):
         argv = [

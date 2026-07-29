@@ -1,6 +1,7 @@
 import os
 import io
 import json
+import shlex
 import subprocess
 import sys
 import urllib.error
@@ -20,11 +21,19 @@ from niko_agent import (
     build_welcome,
 )
 from niko_agent.providers import ProviderError
+from niko_agent.core.runtime_checkpoints import CHECKPOINT_SCHEMA_VERSION
 
 
 def build_workspace(tmp_path):
     (tmp_path / "README.md").write_text("demo\n", encoding="utf-8")
-    return WorkspaceContext.build(tmp_path)
+    return WorkspaceContext.build(tmp_path, repo_root_override=tmp_path)
+
+
+def python_command(script):
+    argv = [sys.executable, "-c", script]
+    if os.name == "nt":
+        return subprocess.list2cmdline(argv)
+    return shlex.join(argv)
 
 
 def build_agent(tmp_path, outputs, **kwargs):
@@ -276,7 +285,7 @@ def test_welcome_screen_keeps_box_shape_for_long_paths(tmp_path):
     assert len({len(line) for line in lines}) == 1
     assert "..." in welcome
     assert "(  o o  )" in welcome
-    assert "niko_agent" in welcome
+    assert "NIKO" in welcome
     assert "local coding agent" in welcome
     assert "// READY" not in welcome
     assert "SLASH" not in welcome
@@ -962,11 +971,12 @@ def test_successful_run_persists_run_artifacts_and_stop_reason(tmp_path):
 
 def test_trace_and_report_redact_secret_env_values(tmp_path):
     secret = "sk-test-secret-123"
+    command = python_command(f"print({secret!r})")
     with patch.dict(os.environ, {"OPENAI_API_KEY": secret}, clear=True):
         agent = build_agent(
             tmp_path,
             [
-                '<tool>{"name":"run_shell","args":{"command":"printf \'%s\' \'sk-test-secret-123\'","timeout":20}}</tool>',
+                f'<tool>{{"name":"run_shell","args":{{"command":{json.dumps(command)},"timeout":20}}}}</tool>',
                 "<final>Masked.</final>",
             ],
         )
@@ -1084,7 +1094,7 @@ def test_agent_creates_checkpoint_when_context_reduction_happens_and_artifacts_o
     checkpoint_state = agent.session["checkpoints"]
     checkpoint = checkpoint_state["items"][checkpoint_state["current_id"]]
     assert checkpoint["checkpoint_id"] == checkpoint_state["current_id"]
-    assert checkpoint["schema_version"] == "phase1-v1"
+    assert checkpoint["schema_version"] == CHECKPOINT_SCHEMA_VERSION
     assert checkpoint["current_goal"] == "Resume the long task"
     assert checkpoint["key_files"] == []
     assert checkpoint["current_blocker"] == ""
@@ -1116,7 +1126,7 @@ def test_resume_prompt_uses_checkpoint_state_not_just_history(tmp_path):
             "ckpt_manual": {
                 "checkpoint_id": "ckpt_manual",
                 "parent_checkpoint_id": "",
-                "schema_version": "phase1-v1",
+                "schema_version": CHECKPOINT_SCHEMA_VERSION,
                 "created_at": "2026-04-14T09:00:00+00:00",
                 "current_goal": "Fix failing resume flow",
                 "completed": ["Read runtime.py"],
@@ -1126,7 +1136,7 @@ def test_resume_prompt_uses_checkpoint_state_not_just_history(tmp_path):
                 "key_files": [{"path": "runtime.py", "freshness": "abc"}],
                 "freshness": {"runtime.py": "abc"},
                 "summary": "Resume from the latest checkpoint",
-                "runtime_identity": {"workspace_fingerprint": "old-fingerprint"},
+                "runtime_identity": agent.current_runtime_identity(),
             }
         },
     }
@@ -1161,7 +1171,7 @@ def test_resume_invalidates_stale_file_summaries_and_marks_partial_stale(tmp_pat
             "ckpt_stale": {
                 "checkpoint_id": "ckpt_stale",
                 "parent_checkpoint_id": "",
-                "schema_version": "phase1-v1",
+                "schema_version": CHECKPOINT_SCHEMA_VERSION,
                 "created_at": "2026-04-14T09:00:00+00:00",
                 "current_goal": "Fix stale summary handling",
                 "completed": [],
@@ -1218,7 +1228,7 @@ def test_resume_marks_workspace_mismatch_when_checkpoint_runtime_identity_is_sta
             "ckpt_workspace": {
                 "checkpoint_id": "ckpt_workspace",
                 "parent_checkpoint_id": "",
-                "schema_version": "phase1-v1",
+                "schema_version": CHECKPOINT_SCHEMA_VERSION,
                 "created_at": "2026-04-14T09:00:00+00:00",
                 "current_goal": "Continue after drift",
                 "completed": [],
@@ -1242,8 +1252,11 @@ def test_resume_marks_workspace_mismatch_when_checkpoint_runtime_identity_is_sta
         approval_policy="auto",
     )
 
-    assert resumed.ask("Continue the task") == "Resumed."
+    answer = resumed.ask("Continue the task")
+    assert "will not guess missing state" in answer
     assert resumed.last_prompt_metadata["resume_status"] == "workspace-mismatch"
+    assert resumed.current_task_state.stop_reason == "unsafe_resume_state"
+    assert resumed.model_client.prompts == []
 
 
 def test_write_file_trace_records_minimum_tool_contract_fields(tmp_path):
@@ -1338,7 +1351,7 @@ def test_freshness_mismatch_creates_checkpoint_before_model_completion(tmp_path)
             "ckpt_freshness": {
                 "checkpoint_id": "ckpt_freshness",
                 "parent_checkpoint_id": "",
-                "schema_version": "phase1-v1",
+                "schema_version": CHECKPOINT_SCHEMA_VERSION,
                 "created_at": "2026-04-14T09:00:00+00:00",
                 "current_goal": "Handle freshness mismatch",
                 "completed": [],
@@ -1401,7 +1414,7 @@ def test_resume_records_runtime_identity_mismatch_fields_in_metadata_and_trace(t
             "ckpt_identity": {
                 "checkpoint_id": "ckpt_identity",
                 "parent_checkpoint_id": "",
-                "schema_version": "phase1-v1",
+                "schema_version": CHECKPOINT_SCHEMA_VERSION,
                 "created_at": "2026-04-14T09:00:00+00:00",
                 "current_goal": "Resume with a different runtime identity",
                 "completed": [],
