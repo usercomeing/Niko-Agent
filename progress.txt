@@ -15,6 +15,7 @@
 - 已完成计划条款逐项证据审计，并用 `bceee1a` 修复 metrics 的时区弃用警告。
 - 已清理早期分支内容的尾随空白；当前改动和相对 `feature/niko-v1` 的完整分支差异均通过 `git diff --check`。
 - 2026-07-29 已在当前源码 worktree 复跑 full 离线门禁：Ruff 通过，337 passed、5 skipped、1 个 `.pytest_cache` 权限警告；Gate8 9/9，deterministic evaluation 12/12。
+- 已创建当前验证与协作规则里程碑提交：`7183520 docs: record current v1 verification state`。
 
 进行中
 - v1 本地离线开发与交付已完成。候选后续项是 Windows 超长路径下的 session event 持久化加固，等待用户确认是否纳入范围。
