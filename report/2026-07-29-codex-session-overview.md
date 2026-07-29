@@ -85,3 +85,29 @@
 ### 下一步
 
 - 完成本地文档提交后，进入 v2 需求澄清与计划确认；只有用户确认后，才开始新的代码改动。
+
+## GitHub 仓库整理与协作审计阶段
+
+### 目标与授权
+
+- 用户提供仓库 `https://github.com/usercomeing/Niko-Agent`，要求盘点并整理远程分支、待合并内容和 PR。
+- 已安装官方 `gh-address-comments` 与 `gh-fix-ci` 技能，并安装 GitHub CLI；用户随后完成 GitHub CLI 登录。远程读操作使用管理员账号，但尚未执行任何远程写操作。
+
+### 审计结论
+
+- 仓库为公开仓库，默认分支为 `main`；当前没有开放 PR、开放 issue 或最近 GitHub Actions 运行。
+- `main` 没有分支保护，且源码不存在 `.github/` CI 或 PR 模板；这是后续治理事项，不在本次未经确认的远程设置修改范围内。
+- PR #1（`work/niko-v1-recovery-eval` → `main`）已合并；对应远程分支已经完全合入 `main`，可在确认后删除。
+- `feature/niko-v1` 是指定的 v1 开发基线，保留；`work/niko-v1-completion` 尚未推送，包含 11 个待交付 v1 收尾提交，本次审计记录将作为额外文档提交加入。`main` 相对完成分支仅多两个历史 merge commit。
+
+### 计划中的操作顺序
+
+1. 提交本地协作记录并推送 `work/niko-v1-completion`。
+2. 创建指向 `main` 的 PR，描述离线 full gate、已知 Windows 超长路径候选项和未执行的真实 Provider smoke。
+3. 等待用户确认后才合并；合并后再清理已合并的 recovery 分支。
+4. 单独确认并实施 CI、PR 模板和 `main` 保护规则，避免将治理策略混入 v1 功能 PR。
+
+### 验证与风险
+
+- 本阶段只读取 GitHub 元数据和本地提交图，未推送、创建 PR、关闭/删除分支、修改保护规则或合并。
+- 后续 push/PR 会公开当前完成分支的 11 个提交及其 71 个文件差异；合并、删除远程分支和修改保护规则属于可见且不可逆性较高的远程操作，须按顺序执行并留证。

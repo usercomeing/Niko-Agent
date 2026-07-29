@@ -1,35 +1,23 @@
 已完成
 - 已按《Niko-Agent v1 二次开发计划》完成 Niko 品牌、唯一 `niko` CLI、`.niko/` 状态目录、`.niko.toml` 与 `NIKO_*` 配置接口的交付审计。
-- 已完成敏感路径统一保护：模型工具不能列出、搜索、读取或改写 `.env*`、`.niko.toml`、SSH/GPG/云凭据、私钥及 `.niko/` 运行证据；`.env.example` 等空模板仍可访问；原始路径和符号链接解析目标均校验。
-- 已完成 `/fork`、checkpoint 快照和 `/rollback` 两阶段恢复：一次性限时 token、workspace/manifest/文件哈希复核、16 MiB/128 MiB 上限、恢复前备份、journal/report、失败补偿、父会话只追加和失败子会话标记均有回归覆盖。
-- 已修复非 Git 临时工作区继承父目录 Git 根导致的 worker/metrics 长等待，并确保 prefix、worker、evaluation、metrics 全程保持显式 workspace root 边界。
-- 已修复恢复安全契约：runtime identity mismatch 优先 fail closed，freshness-only 变化仍能重建 checkpoint；可信写入后刷新 workspace fingerprint。
-- 已修复 Windows shell 在最小环境、缺失 HOME、存在 cmd AutoRun 和复杂引号时的启动问题；verifier 各阶段有界超时，超时只清理自身进程树。
-- 已完成配置与运行证据脱敏：父目录配置不再继承，配置项密钥、模型输出、工具输出、session、trace、report 和 memory 写入均不会持久化明文秘密，同时不破坏内存中的工具解析语义。
-- 已补齐英文 README、运行证据结构文档和 Windows sandbox 降级说明。
-- 最新 quick gate：Ruff 通过，60 passed，2 skipped（37.13 秒）。
+- 已完成敏感路径统一保护、`/fork`/checkpoint/`/rollback` 两阶段恢复、workspace fingerprint fail-closed、Windows shell 启动兼容、运行证据脱敏、memory/skills/sandbox、worker 与离线验证能力；详细设计和证据见 `docs/二开结果文档.md`。
 - 2026-07-29 已在当前源码 worktree 复跑 full 离线门禁：Ruff 通过，pytest `337 passed, 5 skipped`（仅 1 个 `.pytest_cache` 权限警告）；Gate8 9/9；deterministic evaluation 12/12。
-- CLI smoke：`python -m niko_agent --help` 通过；`git diff --check` 通过；常见真实密钥格式扫描无命中。
-- 已创建本地里程碑提交：`53d9e33`（安全/恢复/运行时）、`d8718d6`（有界 verifier）、`bceee1a`（metrics 时区）、`d3a646c`（v1 证据）、`7183520` 与 `32fb1fd`（当前验证与协作记录）。
 - 已完成 `docs/二开结果文档.md`：包含模块地图、运行/恢复数据流、10 个功能记录、需求—实现追溯、验证证据、提交历史、已知限制与 v2 候选项；未改动产品代码、测试样例或 fixture。
+- 已完成 GitHub 仓库只读审计：管理员账号已认证；没有开放 PR、issue 或 Actions 运行；`main` 未受保护；PR #1 的 recovery 分支已合并；`work/niko-v1-completion` 尚未推送，含 11 个待交付 v1 收尾提交，本次审计记录将作为额外文档提交加入。
 
 进行中
-- v1 本地离线开发与交付已完成；本会话的完整二开结果文档已完成并进入文档自检与本地提交阶段。
+- 固化 GitHub 审计记录并创建本地文档提交；随后将推送 `work/niko-v1-completion` 并新建指向 `main` 的 PR。
 - Windows 超长路径下的 session event 持久化加固明确暂不实施，保留为 v2 计划候选项。
 
 接下来
-- 与用户确认 v2 的业务目标、优先级、边界、验收标准和里程碑，再创建 v2 精简计划；不在计划确认前修改产品代码。
-- 在 v2 讨论中决定是否纳入 Windows 超长路径下的 session/run 持久化加固。
-- 如获授权安装 `uv`，原样复跑计划中的 quick、full 与 deterministic 三个 `uv run ...` 入口。
-- 如获单独授权，仅执行一次最小真实 provider 烟测，不输出或复用密钥。
-- 如获单独授权，将本地完成分支推送到匹配的 GitHub 分支；不直接修改 main，不自动创建 PR。
-- 如获明确授权，先复核 PID、路径和启动时间，再仅终止早期超时遗留 Python 进程。
-- 如用户提供包含 `4adae0b` 的 Pico 仓库/对象，则补跑历史基线；也可由用户明确豁免该项。
+- 审计记录提交后，推送完成分支并创建 PR；合并必须等待用户确认。
+- 合并后，在明确授权下删除已合并的 `work/niko-v1-recovery-eval`；保留 `feature/niko-v1`。
+- 单独确认 CI workflow、PR 模板和 `main` 分支保护的具体 required checks/审批数，再实施仓库治理设置。
+- 仓库状态稳定后，与用户确认 v2 的业务目标、优先级、边界、验收标准和里程碑，再创建 v2 精简计划。
+- 如获授权安装 `uv`，原样复跑计划中的 quick、full 与 deterministic 三个 `uv run ...` 入口；真实 Provider smoke 仍需单独授权。
 
 已知bug
 - 当前离线交付门禁没有已知功能失败。
 - 在经典 Windows 路径限制下，超长临时根会使 `.niko/sessions/<session-id>.events.jsonl` 路径超过约 260 字符；短临时根下完整门禁通过。用户已要求本轮不修复，待 v2 计划决定是否加固。
 - 当前 Windows 主机没有创建符号链接的权限，相关安全测试按设计跳过；其他符号链接逻辑由可用平台测试覆盖。
-- 4 个早期超时遗留 Python 进程仍存在；因未获终止授权而保留。
-- 当前 Git 对象库不包含历史 Pico 基线 `4adae0b`，`D:\codex_project` 下也没有可用的 Pico 仓库，因此无法补跑计划中历史基线的原始门禁；当前 Niko 代码的完整门禁已通过。
-- 当前命令环境没有 `uv` 可执行文件；三个计划入口已用同一虚拟环境的底层 Python 命令验证，但 `uv run ...` 包装形式需获准安装 `uv` 后才能原样复跑。
+- 当前 Git 对象库不包含历史 Pico 基线 `4adae0b`，当前命令环境没有 `uv` 可执行文件；两项均不影响已通过的本地 full gate，但需在有材料/授权时补验。
