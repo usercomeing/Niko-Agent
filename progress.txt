@@ -1,4 +1,5 @@
 已完成
+- 本地演示交付完成（2026-09-09 20:02）：同一 reviewer 已关闭 major；实现提交 f074c11 已推送，PR #5 https://github.com/usercomeing/Niko-Agent/pull/5 已创建（OPEN，未合并）。跨仓库使用见 README.md 和 docs/configuration.md。
 - 最终审查修复验证（2026-09-09）：保留启动环境来源，避免 .env 后备地址覆盖 TOML；全量 359 passed, 5 skipped，新增回归 22 passed，验收 9/9、评测 12/12。安装快照已重建并在两个独立仓库复验通过。
 - 本地演示修复（2026-09-09）：/model 真实切换 Provider/模型与后续子 Agent factory；/mode plan/default 复用计划模式并保留旧命令；全量测试 356 passed, 5 skipped，会话验收 9/9、确定性评测 12/12。uv 独立安装、PATH 入口及 Niko 专属用户配置已完成。
 - 已按《Niko-Agent v1 二次开发计划》完成 Niko 品牌、唯一 `niko` CLI、`.niko/` 状态目录、`.niko.toml` 与 `NIKO_*` 配置接口的交付审计。
@@ -10,12 +11,12 @@
 - 已创建仅文档的 [PR #3](https://github.com/usercomeing/Niko-Agent/pull/3)，同步 PR #2 合并后产生的状态记录；不包含产品代码、测试、依赖或配置变更。
 
 进行中
-- 本地演示修复：实现、安装、演示和同一 reviewer 复查均完成；进行 Git 提交和 PR 交付。
+- 本地演示任务无进行中实现；PR #5 等待用户审阅，当前无远程检查。
 - PR #3 正等待用户审阅和明确合并确认；本项目不自动合并到 `main`。
 - Windows 超长路径下的 session event 持久化加固明确暂不实施，保留为 v2 计划候选项。
 
 接下来
-- 完成本地演示验证，提交 codex/fix-local-demo 并创建独立 PR；不携带 v2 规划或治理 PR #4 改动。
+- 用户在目标仓库运行 niko --repl，或使用 niko --cwd <目标仓库> --repl；审阅 PR #5，另行安排既有 Ruff 新规则迁移。未携带 v2 规划或治理 PR #4 改动。
 - 获得用户确认后合并 PR #3；随后复核 `main`。
 - 在明确授权下删除已合并的 `work/niko-v1-recovery-eval`；PR #3 合并后按需要清理 `work/niko-v1-completion`。保留 `feature/niko-v1`。
 - 单独确认 CI workflow、PR 模板和 `main` 分支保护的 required checks/审批数，再实施仓库治理设置。

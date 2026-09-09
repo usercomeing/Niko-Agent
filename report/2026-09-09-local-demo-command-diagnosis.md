@@ -1,7 +1,7 @@
 # 本地演示：模型、模式与跨仓库安装修复
 
 - 目标：解决模型切换与缺少 Key、模式切换、仓库外找不到 niko，并完成 PR。
-- 起止：2026-09-09，诊断结束采样 16:51（Asia/Shanghai）；实施中，结束时间待补。
+- 起止：2026-09-09，诊断结束采样 16:51，交付完成记录 20:02（Asia/Shanghai）；中途因审查账号额度暂停，19:49 用户要求继续。
 - 用户决策：只完善 `/model`，不新增 `/models`；增加 `/mode` 切换并保留旧 plan 命令；执行本机安装并写明不同仓库的用法；完成后提交和创建 PR。
 - 边界：用户确认后编辑既有源码 worktree。从 origin/main 建立 codex/fix-local-demo，保留原 work/niko-v2-plan 及其两笔规划提交；不修改既有测试、fixture、历史报告或治理 PR #4。
 - 二开结果文档：[本次实现说明](../docs/二开结果文档.md)。
@@ -56,5 +56,7 @@
 - 原始 full 门禁的 179 项 lint 是遗留问题；本次原样报告。全量功能测试结果不能称为整个 full 门禁通过。
 - GitHub 认证已验证，既有治理 PR #4 不属于本次范围；不会合并 PR、修改保护规则或清理旧环境。
 - Key、用户配置与运行产物不提交。
-- 下一步：创建 Conventional Commit、推送并创建独立 PR；实现、安装、演示和审查均已完成。
-- 关联提交：本实现提交 `fix: repair model and mode switching for local demos`；提交后补充 SHA 与 PR 地址。
+- 已完成交付：实现提交 `f074c1162a95babbb7d515b5ad63a13e1f5fc620`（`fix: repair model and mode switching for local demos`）已推送；[PR #5](https://github.com/usercomeing/Niko-Agent/pull/5) 为 `codex/fix-local-demo` → `main`，OPEN、非草稿、MERGEABLE，当前无远程检查。未合并。
+- 本次文档补充提交：`docs: record local demo PR delivery`，仅记录同一任务的交付状态，不包含行为变更。
+- 未完成项：本任务无剩余实现、安装或 PR 创建工作；原始 Ruff 门禁的 179 项既有问题作为已声明限制保留。
+- 下一步：用户在目标仓库运行 `niko --repl` 或 `niko --cwd <目标> --repl`；审阅 PR #5，另行安排既有 Ruff 新规则迁移。合并需用户明确确认。
