@@ -25,6 +25,7 @@ from .config import (
 from .features import skills as skillslib
 from .features.skills_runtime import invoke_skill
 from .providers import AnthropicCompatibleModelClient, OpenAICompatibleModelClient
+from .model_selection import ModelSelection, ModelSelectionError
 from .core.runtime import Niko, SessionStore
 from .core.workspace import WorkspaceContext, middle
 
@@ -177,6 +178,7 @@ def build_agent(args):
     # 先采集工作区快照，再整理 secret 名单、模型后端和 session。
     workspace = WorkspaceContext.build(args.cwd)
     store = SessionStore(workspace.repo_root + "/.niko/sessions")
+    model_environment = dict(os.environ)
     provider_config = resolve_provider_config(
         getattr(args, "provider", None),
         start=workspace.repo_root,
@@ -191,7 +193,8 @@ def build_agent(args):
     def model_client_factory():
         return _build_model_client(args, provider_config)
 
-    if args.max_new_tokens is None:
+    automatic_token_budget = args.max_new_tokens is None
+    if automatic_token_budget:
         args.max_new_tokens = default_max_tokens_for_provider(provider_config.name)
 
     sandbox_config = resolve_project_sandbox_config(
@@ -216,7 +219,7 @@ def build_agent(args):
     dream_min_sessions = getattr(args, "dream_min_sessions", 5)
     ask_user_callback = None if getattr(args, "prompt", None) else _cli_ask_user
     if session_id:
-        return Niko.from_session(
+        agent = Niko.from_session(
             model_client=model,
             workspace=workspace,
             session_store=store,
@@ -234,23 +237,33 @@ def build_agent(args):
             sandbox_config=sandbox_config,
             ask_user_callback=ask_user_callback,
         )
-    return Niko(
-        model_client=model,
-        workspace=workspace,
-        session_store=store,
-        approval_policy=args.approval,
-        max_steps=args.max_steps,
-        max_new_tokens=args.max_new_tokens,
-        secret_env_names=configured_secret_names,
-        secret_values=[provider_config.api_key],
-        memory_dir=memory_dir,
-        auto_dream=auto_dream,
-        dream_interval_hours=dream_interval,
-        dream_min_sessions=dream_min_sessions,
-        model_client_factory=model_client_factory,
-        sandbox_config=sandbox_config,
-        ask_user_callback=ask_user_callback,
+    else:
+        agent = Niko(
+            model_client=model,
+            workspace=workspace,
+            session_store=store,
+            approval_policy=args.approval,
+            max_steps=args.max_steps,
+            max_new_tokens=args.max_new_tokens,
+            secret_env_names=configured_secret_names,
+            secret_values=[provider_config.api_key],
+            memory_dir=memory_dir,
+            auto_dream=auto_dream,
+            dream_interval_hours=dream_interval,
+            dream_min_sessions=dream_min_sessions,
+            model_client_factory=model_client_factory,
+            sandbox_config=sandbox_config,
+            ask_user_callback=ask_user_callback,
+        )
+    agent.model_selection = ModelSelection(
+        provider_config,
+        lambda config: _build_model_client(args, config),
+        root=workspace.repo_root,
+        config_path=getattr(args, "config", None),
+        automatic_token_budget=automatic_token_budget,
+        environment=model_environment,
     )
+    return agent
 
 
 def build_arg_parser():
@@ -413,8 +426,20 @@ def handle_repl_command(agent, user_input):
     if user_input == "/plan-exit":
         agent.exit_plan_mode()
         return True, False, "mode: default"
-    if user_input == "/mode":
-        return True, False, _format_mode_status(agent)
+    if command_name == "mode":
+        if not command_args:
+            return True, False, _format_mode_status(agent)
+        if command_args == "default":
+            agent.exit_plan_mode()
+            return True, False, "mode: default"
+        mode, _, topic = command_args.partition(" ")
+        if mode == "plan" and topic.strip():
+            try:
+                plan_path = agent.enter_plan_mode(topic.strip())
+            except ValueError as exc:
+                return True, False, f"error: {exc}"
+            return True, False, f"mode: plan\nplan path: {plan_path}"
+        return True, False, "Usage: /mode [plan <topic> | default]"
     if user_input == "/session":
         return True, False, _format_session_status(agent)
     if command_name == "agents":
@@ -434,11 +459,20 @@ def handle_repl_command(agent, user_input):
         )
     if user_input == "/usage":
         return True, False, _format_usage(agent)
-    if user_input == "/model" or user_input.startswith("/model "):
-        _, _, model = user_input.partition(" ")
-        model = model.strip()
+    if command_name == "model":
+        model = command_args
         if not model:
             return True, False, _format_model(agent)
+        selection = getattr(agent, "model_selection", None)
+        if selection is not None:
+            try:
+                model = selection.switch(agent, model)
+            except ModelSelectionError as exc:
+                return True, False, f"error: {exc}"
+            except (ValueError, OSError, RuntimeError):
+                # Parser and client errors may contain private configuration.
+                return True, False, "error: 模型切换失败，请检查目标 provider 配置；原连接已保留。"
+            return True, False, f"model: {model}"
         setattr(agent.model_client, "model", model)
         agent.session_event_bus.emit("model_changed", {"model": model})
         agent.refresh_prefix(force=True)
@@ -573,7 +607,11 @@ def _format_usage(agent):
 
 
 def _format_model(agent):
-    return f"model: {getattr(agent.model_client, 'model', '-') or '-'}"
+    text = f"model: {getattr(agent.model_client, 'model', '-') or '-'}"
+    selection = getattr(agent, "model_selection", None)
+    if selection is not None:
+        text += f"\nprovider: {selection.current.name}\nUsage: /model [<model> | <provider> [model]]"
+    return text
 
 
 def _format_history(agent):
