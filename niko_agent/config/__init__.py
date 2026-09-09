@@ -3,6 +3,7 @@
 import os
 import re
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -51,6 +52,7 @@ PROVIDER_DEFAULTS: dict[str, dict[str, str]] = {
 PROVIDER_ALIASES = {
     "gpt": "openai",
     "claude": "anthropic",
+    "dpsk": "deepseek",
 }
 
 PROTOCOLS = {"openai", "anthropic"}
@@ -210,7 +212,10 @@ def resolve_provider_config(
     base_url: str | None = None,
     api_key: str | None = None,
     search_parents: bool = True,
+    include_generic_env: bool = True,
+    environment: Mapping[str, str] | None = None,
 ) -> ProviderConfig:
+    environment = os.environ if environment is None else environment
     file_values = _load_config_values(
         start=start,
         explicit_path=config_path,
@@ -218,9 +223,17 @@ def resolve_provider_config(
     )
     legacy_env = _load_legacy_env_values(start, search_parents=search_parents)
 
+    # Generic overrides belong to the initially selected connection. Interactive
+    # cross-profile switches must not send its key to a different endpoint.
+    def generic(name):
+        return environment.get(name) if include_generic_env else None
+
+    def legacy_generic(name):
+        return legacy_env.get(name) if include_generic_env else None
+
     requested_provider = (
         provider
-        or os.environ.get(ENV_PROVIDER)
+        or environment.get(ENV_PROVIDER)
         or file_values["top"].get("provider")
         or legacy_env.get(ENV_PROVIDER)
         or DEFAULT_PROVIDER
@@ -231,40 +244,40 @@ def resolve_provider_config(
 
     protocol = _first_value(
         None,
-        os.environ.get("NIKO_PROTOCOL"),
+        generic("NIKO_PROTOCOL"),
         profile_values.get("protocol"),
-        legacy_env.get("NIKO_PROTOCOL"),
+        legacy_generic("NIKO_PROTOCOL"),
         default_values.get("protocol"),
     )
     protocol = _validate_protocol(protocol, provider_name)
 
-    env_values = _env_values(provider_name, protocol)
+    env_values = _env_values(provider_name, protocol, environment)
     legacy_values = _legacy_values(provider_name, protocol, legacy_env)
 
     resolved_model = _first_value(
         model,
-        os.environ.get(ENV_MODEL),
+        generic(ENV_MODEL),
         env_values.get("model"),
         profile_values.get("model"),
-        legacy_env.get(ENV_MODEL),
+        legacy_generic(ENV_MODEL),
         legacy_values.get("model"),
         default_values.get("model"),
     )
     resolved_base_url = _first_value(
         base_url,
-        os.environ.get(ENV_BASE_URL),
+        generic(ENV_BASE_URL),
         env_values.get("base_url"),
         profile_values.get("base_url"),
-        legacy_env.get(ENV_BASE_URL),
+        legacy_generic(ENV_BASE_URL),
         legacy_values.get("base_url"),
         default_values.get("base_url"),
     )
     resolved_api_key = _first_value(
         api_key,
-        os.environ.get(ENV_API_KEY),
+        generic(ENV_API_KEY),
         env_values.get("api_key"),
         profile_values.get("api_key"),
-        legacy_env.get(ENV_API_KEY),
+        legacy_generic(ENV_API_KEY),
         legacy_values.get("api_key"),
         "",
     )
@@ -302,6 +315,11 @@ def resolve_project_sandbox_config(
 def normalize_provider_name(provider: str | None) -> str:
     normalized = (provider or DEFAULT_PROVIDER).strip().lower()
     return PROVIDER_ALIASES.get(normalized, normalized)
+
+
+def configured_provider_names(start: str | Path, config_path: str | None = None) -> set[str]:
+    values = _load_config_values(start, config_path, search_parents=False)
+    return set(PROVIDER_DEFAULTS) | set(values["providers"])
 
 
 def _load_config_values(
@@ -383,14 +401,16 @@ def _load_legacy_env_values(
     return loaded
 
 
-def _env_values(provider_name: str, protocol: str) -> dict[str, str]:
+def _env_values(
+    provider_name: str, protocol: str, environment: Mapping[str, str]
+) -> dict[str, str]:
     values: dict[str, str] = {}
     sources = [PROVIDER_ENV_NAMES.get(provider_name, {})]
     if provider_name == protocol:
         sources.append(PROVIDER_ENV_NAMES.get(protocol, {}))
     for source in sources:
         for key, names in source.items():
-            value = _first_env(names)
+            value = _first_mapping_value(environment, names)
             if value and key not in values:
                 values[key] = value
     return values
@@ -419,7 +439,7 @@ def _first_env(names: tuple[str, ...]) -> str:
     return ""
 
 
-def _first_mapping_value(values: dict[str, str], names: tuple[str, ...]) -> str:
+def _first_mapping_value(values: Mapping[str, str], names: tuple[str, ...]) -> str:
     for name in names:
         value = values.get(name)
         if value:
